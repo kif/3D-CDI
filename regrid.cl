@@ -1,9 +1,6 @@
-/* 2D kernel, one thread per input pixel
- * 
- * pixel start at 0 and finish at 1, the center is at 0.5
- * thread ids follow the memory location convention (zyx) not the math x,y,z convention 
- */ 
 
+
+// Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
 {
    union {
@@ -19,14 +16,15 @@ inline void atomic_add_global_float(volatile global float *addr, float val)
    } while( current.u32 != expected.u32 );
 }
 
+// Performs the centering/scaling in the detector plane. Image flipping must be implemented here
 float2 inline calc_position_real(float2 index,
                                  float2 center,
                                  float pixel_size)
 {
-    return (center - index) * pixel_size;
+    return (index - center) * pixel_size;
 }
 
-
+// Transforms a 2D position in the image into a 3D coordinate in the volume
 float3 inline calc_position_rec(float2 index,
                                 float2 center,
                                 float pixel_size,
@@ -38,34 +36,49 @@ float3 inline calc_position_rec(float2 index,
     float2 pos2 = calc_position_real(index, center, pixel_size);
     float d = sqrt(distance*distance + dot(pos2, pos2));
     float3 pos3 = (float3)(pos2.x/d, pos2.y/d, distance/d-1.0f);
-    float scale = distance * distance / pixel_size; 
-    return scale*(float3)(dot(Rx, pos3), dot(Ry, pos3), dot(Rz, pos3));
+    float scale = distance*distance/pixel_size;
+    return scale * (float3)(dot(Rx, pos3), dot(Ry, pos3), dot(Rz, pos3));
 }
-                                
 
-kernel void regid_CDI(global float* image,
-                      const  int height,
-                      const  int width,
-                      const  float pixel_size,
-                      const  float distance,
-                      const  float phi,
-                      const  float center_x,
-                      const  float center_y,
-                      global float *volume,
-                      const  int volume_shape,
-                      const  int oversampling)
+/* Performs the regridding of an image on a 3D volume
+ *
+ * 2D kernel, one thread per input pixel. Scatter-like kernel with atomics.
+ * 
+ * pixel start at 0 and finish at 1, the center is at 0.5
+ * thread ids follow the memory location convention (zyx) not the math x,y,z convention 
+ *   
+ * Basic oversampling implemented but slows down the processing, mainly for calculating 
+ * Atomic operations are the second bottleneck
+ */ 
+
+    
+kernel void regid_CDI_simple(global float* image,
+                             const  int    height,
+                             const  int    width,
+                             const  float  pixel_size,
+                             const  float  distance,
+                             const  float  phi,
+                             const  float  center_x,
+                             const  float  center_y,
+                             global float* signal,
+                             global float* norm,
+                             const  int    shape,
+                                    int    oversampling)
 {
-    int tmp;
+    int tmp, shape_2, i, j, k;
     size_t where_in, where_out;
-    float value, cos_phi, sin_phi;
+    float value, cos_phi, sin_phi, delta, start;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
-    //float4 corners_x, corners_y;
-    
+        
     if ((get_global_id(0)>=height) || (get_global_id(1)>=width))
         return;
     
     where_in = width*get_global_id(0)+get_global_id(1);
+    shape_2 = shape/2;
+    oversampling = (oversampling<1?1:oversampling);
+    start = 0.5f / oversampling;
+    delta = 2 * start;
     
     cos_phi = cos(phi*M_PI_F/180.0f);
     sin_phi = sin(phi*M_PI_F/180.0f);
@@ -73,33 +86,153 @@ kernel void regid_CDI(global float* image,
     Ry = (float3)(0.0f, 1.0f, 0.0f);
     Rz = (float3)(-sin_phi, 0.0f, cos_phi);
     
-    pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(1) + 0.5f); //this is the center of the pixel
-    recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
-    
-    value = image[where_in];
-
     // No oversampling for now
+    //this is the center of the pixel
+    //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
     
-    tmp = (int)recip.x + volume_shape/2;
-    if ((tmp>=0) && (tmp<volume_shape))
+    //Basic oversampling    
+
+    for (i=0; i<oversampling; i++)
     {
-        where_out = tmp;
-        tmp = (int)recip.y + volume_shape/2;
-        if ((tmp>=0) && (tmp<volume_shape))
+        for (j=0; j<oversampling; j++)
         {
-            where_out += tmp*volume_shape;
-            tmp = (int)recip.z + volume_shape/2;
-            if ((tmp>=0) && (tmp<volume_shape))
+            pos2 = (float2)(get_global_id(1) + start + i*delta, 
+                            get_global_id(0) + start + j*delta); 
+            recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+            value = image[where_in];
+    
+            tmp = (int)recip.x + shape/2;
+            if ((tmp>=0) && (tmp<shape))
             {
-                where_out += tmp*volume_shape*volume_shape;    
-                atomic_add_global_float(&volume[2*where_out], value);
-                atomic_add_global_float(&volume[2*where_out+1], 1.0f);
-            }
-        }               
+                where_out = tmp;
+                tmp = (int)recip.y + shape_2;
+                if ((tmp>=0) && (tmp<shape))
+                {
+                    where_out += tmp * shape;
+                    tmp = (int)recip.z + shape_2;
+                    if ((tmp>=0) && (tmp<shape))
+                    {
+                        where_out += ((long)tmp) * shape * shape;  
+                        atomic_add_global_float(&signal[where_out], value);
+                        atomic_add_global_float(&norm[where_out], 1.0f);
+                    }
+                }               
+            }            
+        }
     }
 }
 
-                              
-                             
-                             
-                               
+//Storage for that many voxel per pixel
+#define STORAGE_SIZE 64
+
+kernel void regid_CDI(global float* image,
+                      const  int    height,
+                      const  int    width,
+                      const  float  pixel_size,
+                      const  float  distance,
+                      const  float  phi,
+                      const  float  center_x,
+                      const  float  center_y,
+                      global float* signal,
+                      global float* norm,
+                      const  int    shape,
+                      int    oversampling)
+{
+    int tmp, shape_2, i, j, k;
+    size_t where_in, where_out;
+    float value, delta;
+    float2 pos2, center = (float2)(center_x, center_y);
+    float3 Rx, Ry, Rz, recip;
+    
+    //This is local storage of voxels to be written
+    int last=0;
+    size_t index[STORAGE_SIZE];
+    float2 store[STORAGE_SIZE];
+    
+    
+    
+    if ((get_global_id(0)>=height) || (get_global_id(1)>=width))
+        return;
+    
+    where_in = width*get_global_id(0)+get_global_id(1);
+    shape_2 = shape/2;
+    oversampling = (oversampling<1?1:oversampling);
+    delta = 1.0f / oversampling;
+    {   
+        float cos_phi, sin_phi;
+        cos_phi = cos(phi*M_PI_F/180.0f);
+        sin_phi = sin(phi*M_PI_F/180.0f);
+        Rx = (float3)(cos_phi, 0.0f, sin_phi);
+        Ry = (float3)(0.0f, 1.0f, 0.0f);
+        Rz = (float3)(-sin_phi, 0.0f, cos_phi);
+        
+    }
+    
+    // No oversampling for now
+    //this is the center of the pixel
+    //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
+    
+    //Basic oversampling    
+
+    for (i=0; i<oversampling; i++)
+    {
+        for (j=0; j<oversampling; j++)
+        {
+            pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
+                            get_global_id(0) + (j + 0.5f)*delta); 
+            recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+            value = image[where_in];
+    
+            tmp = (int)recip.x + shape/2;
+            if ((tmp>=0) && (tmp<shape))
+            {
+                where_out = tmp;
+                tmp = (int)recip.y + shape_2;
+                if ((tmp>=0) && (tmp<shape))
+                {
+                    where_out += tmp * shape;
+                    tmp = (int)recip.z + shape_2;
+                    if ((tmp>=0) && (tmp<shape))
+                    {
+                        where_out += ((long)tmp) * shape * shape;  
+                        /*
+                        atomic_add_global_float(&signal[where_out], value);
+                        atomic_add_global_float(&norm[where_out], 1.0f);
+                        
+                        signal[where_out] += value;
+                        norm[where_out] += 1.0f;
+                        */
+                        //storage locally
+                        int found = 0;
+                        for (k=0; k<last; k++)
+                        {
+                            if (where_out == index[k])
+                            {
+                                    store[k] += (float2)(value, 1.0f);
+                                    found = 1;
+                                    k = last;
+                            }
+                        }
+                        if (found == 0)
+                        {
+                            if (last >= STORAGE_SIZE)
+                                printf("Too many voxels covered by pixel\n");
+                            else
+                            {
+                                index[last] = where_out;
+                                store[last] = (float2)(value, 1.0f);
+                                last++;
+                            }
+                        }  
+                    }
+                }               
+            }            
+        }
+    }
+    // Finally we update the global memory with atomic writes
+    for (k=0; k<last; k++)
+    {
+        atomic_add_global_float(&signal[index[k]], store[k].s0);
+        atomic_add_global_float(&norm[index[k]], store[k].s1);
+    }
+}
