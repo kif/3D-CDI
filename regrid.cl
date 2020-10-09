@@ -23,7 +23,7 @@ float2 inline calc_position_real(float2 index,
                                  float2 center,
                                  float pixel_size)
 {
-    return (index - center) * pixel_size;
+    return (center - index) * pixel_size;
 }
 
 
