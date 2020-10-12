@@ -10,20 +10,26 @@ import numpy
 import pyopencl as cl
 from pyopencl import array as cla
 import time
+import glob
+import fabio
+import h5py, hdf5plugin
 
-nframes = 512
-shape = numpy.int32(512), numpy.int32(512)
-volume = (numpy.int32(512), numpy.int32(512), numpy.int32(512))
-center = (numpy.float32(260), numpy.float32(250))
+frames = glob.glob('/mnt/data/ID10/CDI/SiO2msgel3_cand1/img_*.edf')
+
+nframes = len(frames)
+shape = numpy.int32(568), numpy.int32(568)
+volume = (numpy.int32(568), numpy.int32(568), numpy.int32(568))
+center = (numpy.float32(284), numpy.float32(284))
 pixel_size = numpy.float32(55e-6)
-distance = numpy.float32(3)
-phi = numpy.linspace(-80, 80, nframes).astype(numpy.float32)
-oversampling = numpy.int32(16)
+distance = numpy.float32(3.3)
+oversampling = numpy.int32(8)
+ldphi = numpy.linspace(0, 0.2, oversampling, endpoint=False, dtype=numpy.float32)
+dummy = numpy.float32(0.0)
 
 ctx = cl.create_some_context(interactive=False)
 queue = cl.CommandQueue(ctx)
 
-print(nframes, shape, volume)
+print(nframes, shape, volume, oversampling)
 print(ctx)
 
 with open("regrid.cl", "r") as f:
@@ -31,29 +37,43 @@ with open("regrid.cl", "r") as f:
 
 image_d = cla.empty(queue, shape, dtype=numpy.float32)
 signal_d = cla.empty(queue, volume, dtype=numpy.float32)
-norm_d = cla.empty(queue, volume, dtype=numpy.float32)
-# ws = (32,32)
-# shared = cl.LocalMemory(4*4*(ws[0]+1)*(ws[1]+1))
+norm_d = cla.empty(queue, volume, dtype=numpy.int32)
+
+
+def meas_phi(f):
+    return numpy.float32(f.header.get("motor_pos").split()[f.header.get("motor_mne").split().index("ths")])
+
 
 signal_d.fill(0.0)
-norm_d.fill(0.0)
-image_d.fill(1.0)
-ws = (32, 32)
+norm_d.fill(0)
+ws = (8, 4)
 
 t0 = time.perf_counter()
-for i in phi:
-    evt = prg.regid_CDI(queue, shape, ws,
+for i in frames:
+    f = fabio.open(i)
+    image_d.set(f.data)
+    phi = meas_phi(f)
+    for dphi in ldphi:
+        evt = prg.regid_CDI(queue, shape, ws,
                             image_d.data,
                             *shape,
+                            dummy,
                             pixel_size,
                             distance,
-                            i,
+                            phi + dphi,
                             *center,
                             signal_d.data,
                             norm_d.data,
                             volume[0],
                             oversampling)
 evt.wait()
+try:
+    volume_h = (signal_d / norm_d).get()
+except cl._cl.MemoryError:
+    volume_h = signal_d.get() / norm_d.get()
+
 t1 = time.perf_counter()
-print("Execution time: ", t1 - t0)
-print(signal_d.get().mean(), norm_d.get().mean())
+print("Execution time: ", t1 - t0, "s")
+
+with h5py.File("regrid.h5", mode="w") as h:
+    h.create_dataset("SiO2msgel3", data=volume_h, **hdf5plugin.Bitshuffle())

@@ -1,4 +1,5 @@
-
+//Storage for that many voxel per pixel
+#define STORAGE_SIZE 64
 
 // Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
@@ -122,19 +123,17 @@ kernel void regid_CDI_simple(global float* image,
     }
 }
 
-//Storage for that many voxel per pixel
-#define STORAGE_SIZE 64
-
 kernel void regid_CDI(global float* image,
                       const  int    height,
                       const  int    width,
+                      const  float  dummy,
                       const  float  pixel_size,
                       const  float  distance,
                       const  float  phi,
                       const  float  center_x,
                       const  float  center_y,
                       global float* signal,
-                      global float* norm,
+                      global int*   norm,
                       const  int    shape,
                       int    oversampling)
 {
@@ -172,8 +171,13 @@ kernel void regid_CDI(global float* image,
     //this is the center of the pixel
     //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
     
+    
+    value = image[where_in];
+    
+    //dynamic masking
+    if (value == dummy) return;
+    
     //Basic oversampling    
-
     for (i=0; i<oversampling; i++)
     {
         for (j=0; j<oversampling; j++)
@@ -181,7 +185,7 @@ kernel void regid_CDI(global float* image,
             pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
                             get_global_id(0) + (j + 0.5f)*delta); 
             recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
-            value = image[where_in];
+            
     
             tmp = (int)recip.x + shape/2;
             if ((tmp>=0) && (tmp<shape))
@@ -194,14 +198,10 @@ kernel void regid_CDI(global float* image,
                     tmp = (int)recip.z + shape_2;
                     if ((tmp>=0) && (tmp<shape))
                     {
-                        where_out += ((long)tmp) * shape * shape;  
-                        /*
-                        atomic_add_global_float(&signal[where_out], value);
-                        atomic_add_global_float(&norm[where_out], 1.0f);
-                        
+                        where_out += ((long)tmp) * shape * shape;                          
                         signal[where_out] += value;
                         norm[where_out] += 1.0f;
-                        */
+                        
                         //storage locally
                         int found = 0;
                         for (k=0; k<last; k++)
@@ -233,6 +233,6 @@ kernel void regid_CDI(global float* image,
     for (k=0; k<last; k++)
     {
         atomic_add_global_float(&signal[index[k]], store[k].s0);
-        atomic_add_global_float(&norm[index[k]], store[k].s1);
+        atomic_add(&norm[index[k]], (int)store[k].s1);
     }
 }
