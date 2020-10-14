@@ -131,6 +131,7 @@ kernel void regid_CDI(global float* image,
                       const  float  pixel_size,
                       const  float  distance,
                       const  float  phi,
+                      const  float  dphi,
                       const  float  center_x,
                       const  float  center_y,
                       global float* signal,
@@ -172,15 +173,6 @@ kernel void regid_CDI(global float* image,
     shape_2 = shape/2;
     oversampling = (oversampling<1?1:oversampling);
     delta = 1.0f / oversampling;
-    {   
-        float cos_phi, sin_phi;
-        cos_phi = cos(phi*M_PI_F/180.0f);
-        sin_phi = sin(phi*M_PI_F/180.0f);
-        Rx = (float3)(cos_phi, 0.0f, sin_phi);
-        Ry = (float3)(0.0f, 1.0f, 0.0f);
-        Rz = (float3)(-sin_phi, 0.0f, cos_phi);
-        
-    }
     
     // No oversampling for now
     //this is the center of the pixel
@@ -195,56 +187,65 @@ kernel void regid_CDI(global float* image,
     if (! isfinite(value)) 
         return;
     
-    //Basic oversampling    
-    for (i=0; i<oversampling; i++)
+    //Basic oversampling
+    for (int dr=0; dr<oversampling; dr++)
     {
-        for (j=0; j<oversampling; j++)
+        float cos_phi, sin_phi, rphi;
+        rphi = (phi + (0.0f + dr)*delta*dphi) * M_PI_F/180.0f; 
+        cos_phi = cos(rphi);
+        sin_phi = sin(rphi);
+        Rx = (float3)(cos_phi, 0.0f, sin_phi);
+        Ry = (float3)(0.0f, 1.0f, 0.0f);
+        Rz = (float3)(-sin_phi, 0.0f, cos_phi);
+        for (i=0; i<oversampling; i++)
         {
-            pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
-                            get_global_id(0) + (j + 0.5f)*delta); 
-            recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
-            
-    
-            tmp = (int)recip.x + shape/2;
-            if ((tmp>=0) && (tmp<shape))
+            for (j=0; j<oversampling; j++)
             {
-                where_out = tmp;
-                tmp = (int)recip.y + shape_2;
+                pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
+                                get_global_id(0) + (j + 0.5f)*delta); 
+                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+                
+                tmp = (int)recip.x + shape/2;
                 if ((tmp>=0) && (tmp<shape))
                 {
-                    where_out += tmp * shape;
-                    tmp = (int)recip.z + shape_2;
+                    where_out = tmp;
+                    tmp = (int)recip.y + shape_2;
                     if ((tmp>=0) && (tmp<shape))
                     {
-                        where_out += ((long)tmp) * shape * shape;                          
-                        signal[where_out] += value;
-                        norm[where_out] += 1.0f;
-                        
-                        //storage locally
-                        int found = 0;
-                        for (k=0; k<last; k++)
+                        where_out += tmp * shape;
+                        tmp = (int)recip.z + shape_2;
+                        if ((tmp>=0) && (tmp<shape))
                         {
-                            if (where_out == index[k])
+                            where_out += ((long)tmp) * shape * shape;                          
+                            signal[where_out] += value;
+                            norm[where_out] += 1.0f;
+                            
+                            //storage locally
+                            int found = 0;
+                            for (k=0; k<last; k++)
                             {
-                                    store[k] += (float2)(value, 1.0f);
-                                    found = 1;
-                                    k = last;
+                                if (where_out == index[k])
+                                {
+                                        store[k] += (float2)(value, 1.0f);
+                                        found = 1;
+                                        k = last;
+                                }
                             }
+                            if (found == 0)
+                            {
+                                if (last >= STORAGE_SIZE)
+                                    printf("Too many voxels covered by pixel\n");
+                                else
+                                {
+                                    index[last] = where_out;
+                                    store[last] = (float2)(value, 1.0f);
+                                    last++;
+                                }
+                            }  
                         }
-                        if (found == 0)
-                        {
-                            if (last >= STORAGE_SIZE)
-                                printf("Too many voxels covered by pixel\n");
-                            else
-                            {
-                                index[last] = where_out;
-                                store[last] = (float2)(value, 1.0f);
-                                last++;
-                            }
-                        }  
-                    }
-                }               
-            }            
+                    }               
+                }            
+            }
         }
     }
     // Finally we update the global memory with atomic writes

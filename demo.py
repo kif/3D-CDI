@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-3D CDI preprocessing 
+3D CDI preprocessing
 
 Regrid frames into 3D regular Fourier space
 """
@@ -22,7 +22,8 @@ volume = (numpy.int32(568), numpy.int32(568), numpy.int32(568))
 center = (numpy.float32(284), numpy.float32(284))
 pixel_size = numpy.float32(55e-6)
 distance = numpy.float32(3.3)
-oversampling = numpy.int32(8)
+oversampling = numpy.int32(4)
+dphi = numpy.float32(0.2)
 ldphi = numpy.linspace(0, 0.2, oversampling, endpoint=False, dtype=numpy.float32)
 dummy = numpy.float32(0.0)
 
@@ -55,14 +56,14 @@ for i in frames:
     f = fabio.open(i)
     image_d.set(f.data)
     phi = meas_phi(f)
-    for dphi in ldphi:
-        evt = prg.regid_CDI(queue, shape, ws,
+#     for dphi in ldphi:
+    evt = prg.regid_CDI(queue, shape, ws,
                             image_d.data,
                             *shape,
                             dummy,
                             pixel_size,
                             distance,
-                            phi + dphi,
+                            phi, dphi,
                             *center,
                             signal_d.data,
                             norm_d.data,
@@ -80,7 +81,7 @@ print("Execution time: ", t1 - t0, "s")
 with h5py.File("regrid_mask.h5", mode="w") as h:
     h.create_dataset("SiO2msgel3",
             data=numpy.ascontiguousarray(volume_h, dtype=numpy.float32),
-            #**hdf5plugin.Zfp(reversible=True))
-            **hdf5plugin.Bitshuffle())
+            # **hdf5plugin.Zfp(reversible=True))
+            ** hdf5plugin.Bitshuffle())
     h["oversampling"] = oversampling
     h["kernel"] = kernel_src
