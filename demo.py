@@ -13,6 +13,7 @@ import time
 import glob
 import fabio
 import h5py, hdf5plugin
+from pyFAI.utils.shell import ProgressBar
 
 frames = glob.glob('/mnt/data/ID10/CDI/SiO2msgel3_cand1/img_*.edf')
 
@@ -41,6 +42,8 @@ prg = cl.Program(ctx, kernel_src).build()
 image_d = cla.empty(queue, shape, dtype=numpy.float32)
 signal_d = cla.empty(queue, volume, dtype=numpy.float32)
 norm_d = cla.empty(queue, volume, dtype=numpy.int32)
+mask_d = cla.empty(queue, shape, dtype=numpy.uint8)
+mask_d.set(fabio.open("mask_ID10.edf").data)
 
 
 def meas_phi(f):
@@ -51,15 +54,17 @@ signal_d.fill(0.0)
 norm_d.fill(0)
 ws = (8, 4)
 
+pb = ProgressBar("Projecting frames", nframes, 30)
 t0 = time.perf_counter()
-for i in frames:
+for j, i in enumerate(frames):
     f = fabio.open(i)
     image_d.set(f.data)
     phi = meas_phi(f)
 #     for dphi in ldphi:
     evt = prg.regid_CDI(queue, shape, ws,
                             image_d.data,
-                            *shape,
+                            mask_d.data,
+                            * shape,
                             dummy,
                             pixel_size,
                             distance,
@@ -69,6 +74,7 @@ for i in frames:
                             norm_d.data,
                             volume[0],
                             oversampling)
+    pb.update(j)
 evt.wait()
 try:
     volume_h = (signal_d / norm_d).get()

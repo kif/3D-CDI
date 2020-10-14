@@ -125,6 +125,7 @@ kernel void regid_CDI_simple(global float* image,
 }
 
 kernel void regid_CDI(global float* image,
+                      global uchar* mask,
                       const  int    height,
                       const  int    width,
                       const  float  dummy,
@@ -150,42 +151,45 @@ kernel void regid_CDI(global float* image,
     size_t index[STORAGE_SIZE];
     float2 store[STORAGE_SIZE];
     
-    
-    {
-        //Manual mask definition
-        int y = get_global_id(0),
-            x = get_global_id(1);
-        if ((x >= width) ||
-            (y >= height) ||
-            (x <= 51)  ||
-            (y <= 41)  ||                        
-            ((y >= 297) && (y <= 302)) ||
-            ((x >= 307)&& (x <= 312)) ||
-            ((y >= 278) && (y<=300) && (x>=276) && (x<=314)) ||
-            ((y>=302) && (x>=276) && (x<=296)))
-            return;
-    }
-    
-    if ((get_global_id(0)>=height) || (get_global_id(1)>=width))
-        return;
-    
     where_in = width*get_global_id(0)+get_global_id(1);
     shape_2 = shape/2;
     oversampling = (oversampling<1?1:oversampling);
     delta = 1.0f / oversampling;
     
+    { //Manual mask definition
+        int y = get_global_id(0),
+            x = get_global_id(1);
+        if ((x >= width) ||
+            (y >= height))
+            return;
+//            (x <= 51)  ||
+//            (y <= 41)  ||                        
+//            ((y >= 297) && (y <= 302)) ||
+//            ((x >= 307)&& (x <= 312)) ||
+//            ((y >= 278) && (y<=300) && (x>=276) && (x<=314)) ||
+//            ((y>=302) && (x>=276) && (x<=296)))
+//            return;
+    }
+    { // static mask
+        if (mask[where_in])
+            return;
+    }
+    {//dynamic masking
+        value = image[where_in];
+        if (value < -10.0f)
+            return;
+        else if (value <=0.0f)
+            value= 0.0f;
+        if (! isfinite(value)) 
+            return;
+    }
+    
+
+    
     // No oversampling for now
     //this is the center of the pixel
     //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
 
-    //dynamic masking
-    value = image[where_in];
-    if (value < -10.0f)
-        return;
-    else if (value <=0.0f)
-        value= 0.0f;
-    if (! isfinite(value)) 
-        return;
     
     //Basic oversampling
     for (int dr=0; dr<oversampling; dr++)
