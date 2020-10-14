@@ -217,8 +217,6 @@ kernel void regid_CDI(global float* image,
                         if ((tmp>=0) && (tmp<shape))
                         {
                             where_out += ((long)tmp) * shape * shape;                          
-                            signal[where_out] += value;
-                            norm[where_out] += 1.0f;
                             
                             //storage locally
                             int found = 0;
