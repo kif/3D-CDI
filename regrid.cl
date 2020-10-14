@@ -1,5 +1,6 @@
 //Storage for that many voxel per pixel
-#define STORAGE_SIZE 64
+#define BUCKET_SIZE 8
+#define GROUPS 255
 
 // Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
@@ -124,6 +125,69 @@ kernel void regid_CDI_simple(global float* image,
     }
 }
 
+#define BUCKET_SIZE 8
+#define GROUPS 255
+
+// Function to perform an atom addition in global memory (does not exist in OpenCL)
+inline void atomic_add_local_float(volatile local float *addr, float val)
+{
+   union {
+       uint  u32;
+       float f32;
+   } next, expected, current;
+   current.f32    = *addr;
+   do {
+       expected.f32 = current.f32;
+       next.f32     = expected.f32 + val;
+       current.u32  = atomic_cmpxchg( (volatile local uint *)addr,
+                                      expected.u32, next.u32);
+   } while( current.u32 != expected.u32 );
+}
+
+
+static inline uint hash(ulong index)
+{
+    return (uint) (index%GROUPS);
+}
+
+static inline void store(ulong index, float value,
+                         volatile local uchar* buckets,
+                         volatile local ulong* indexes,
+                                  local float* signal,
+                                  local  uint* count)
+{
+    uint bucket = hash(index);
+    int pos=-1,
+        offset = bucket*BUCKET_SIZE;
+
+    for (uint i=0; i<buckets[bucket]; i++)
+    {
+        ulong rindex = indexes[offset+i];
+        if (index == rindex)
+        {
+            pos = i;
+            i = BUCKET_SIZE;
+        }
+    }
+    if (pos >= 0)
+    {
+        pos = atomic_inc(&buckets[bucket]);
+        if (pos<BUCKET_SIZE)
+            indexes[offset+pos] = index;
+        else
+        {
+            prinf("Overful bucket!\n");
+            pos = -1;
+        }
+    }
+    if (pos >= 0)
+    {
+        atomic_add_local_float(&signal[offset+pos], value);
+        atomic_inc(&count[offset+pos]);
+    }
+    return;
+}
+
 kernel void regid_CDI(global float* image,
                       const  int    height,
                       const  int    width,
@@ -217,8 +281,8 @@ kernel void regid_CDI(global float* image,
                         if ((tmp>=0) && (tmp<shape))
                         {
                             where_out += ((long)tmp) * shape * shape;                          
-                            signal[where_out] += value;
-                            norm[where_out] += 1.0f;
+//                            signal[where_out] += value;
+//                            norm[where_out] += 1.0f;
                             
                             //storage locally
                             int found = 0;
