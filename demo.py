@@ -33,7 +33,9 @@ print(nframes, shape, volume, oversampling)
 print(ctx)
 
 with open("regrid.cl", "r") as f:
-    prg = cl.Program(ctx, f.read()).build()
+    kernel_src = f.read()
+
+prg = cl.Program(ctx, kernel_src).build()
 
 image_d = cla.empty(queue, shape, dtype=numpy.float32)
 signal_d = cla.empty(queue, volume, dtype=numpy.float32)
@@ -70,10 +72,15 @@ evt.wait()
 try:
     volume_h = (signal_d / norm_d).get()
 except cl._cl.MemoryError:
-    volume_h = signal_d.get() / norm_d.get()
+    volume_h = signal_d.get() / norm_d.get().astype(numpy.float32)
 
 t1 = time.perf_counter()
 print("Execution time: ", t1 - t0, "s")
 
-with h5py.File("regrid.h5", mode="w") as h:
-    h.create_dataset("SiO2msgel3", data=volume_h, **hdf5plugin.Bitshuffle())
+with h5py.File("regrid_mask.h5", mode="w") as h:
+    h.create_dataset("SiO2msgel3",
+            data=numpy.ascontiguousarray(volume_h, dtype=numpy.float32),
+            #**hdf5plugin.Zfp(reversible=True))
+            **hdf5plugin.Bitshuffle())
+    h["oversampling"] = oversampling
+    h["kernel"] = kernel_src

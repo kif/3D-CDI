@@ -35,9 +35,10 @@ float3 inline calc_position_rec(float2 index,
                                 float3 Rz)
 {
     float2 pos2 = calc_position_real(index, center, pixel_size);
-    float d = sqrt(distance*distance + dot(pos2, pos2));
+    // float d = sqrt(distance*distance + dot(pos2, pos2));
+    float d = fast_length((float3)(distance, pos2));
     float3 pos3 = (float3)(pos2.x/d, pos2.y/d, distance/d-1.0f);
-    float scale = distance*distance/pixel_size;
+    float scale = distance/pixel_size;
     return scale * (float3)(dot(Rx, pos3), dot(Ry, pos3), dot(Rz, pos3));
 }
 
@@ -149,6 +150,20 @@ kernel void regid_CDI(global float* image,
     float2 store[STORAGE_SIZE];
     
     
+    {
+        //Manual mask definition
+        int y = get_global_id(0),
+            x = get_global_id(1);
+        if ((x >= width) ||
+            (y >= height) ||
+            (x <= 51)  ||
+            (y <= 41)  ||                        
+            ((y >= 297) && (y <= 302)) ||
+            ((x >= 307)&& (x <= 312)) ||
+            ((y >= 278) && (y<=300) && (x>=276) && (x<=314)) ||
+            ((y>=302) && (x>=276) && (x<=296)))
+            return;
+    }
     
     if ((get_global_id(0)>=height) || (get_global_id(1)>=width))
         return;
@@ -170,12 +185,15 @@ kernel void regid_CDI(global float* image,
     // No oversampling for now
     //this is the center of the pixel
     //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
-    
-    
-    value = image[where_in];
-    
+
     //dynamic masking
-    if (value == dummy) return;
+    value = image[where_in];
+    if (value < -10.0f)
+        return;
+    else if (value <=0.0f)
+        value= 0.0f;
+    if (! isfinite(value)) 
+        return;
     
     //Basic oversampling    
     for (i=0; i<oversampling; i++)
@@ -234,5 +252,7 @@ kernel void regid_CDI(global float* image,
     {
         atomic_add_global_float(&signal[index[k]], store[k].s0);
         atomic_add(&norm[index[k]], (int)store[k].s1);
+        //signal[index[k]] += store[k].s0;
+        //norm[index[k]] += (int)store[k].s1;
     }
 }
