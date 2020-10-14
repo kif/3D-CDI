@@ -150,11 +150,11 @@ static inline uint hash(ulong index)
     return (uint) (index%GROUPS);
 }
 
-static inline void store(ulong index, float value,
-                         volatile local uchar* buckets,
-                         volatile local ulong* indexes,
-                                  local float* signal,
-                                  local  uint* count)
+static inline void store_shared(ulong index, float value,
+                                volatile local uint* buckets,
+                                volatile local ulong* indexes,
+                                         local float* signal,
+                                         local  uint* count)
 {
     uint bucket = hash(index);
     int pos=-1,
@@ -176,7 +176,7 @@ static inline void store(ulong index, float value,
             indexes[offset+pos] = index;
         else
         {
-            prinf("Overful bucket!\n");
+            printf("Overful bucket!\n");
             pos = -1;
         }
     }
@@ -203,20 +203,29 @@ kernel void regid_CDI(global float* image,
                       const  int    shape,
                       int    oversampling)
 {
-    int tmp, shape_2, i, j, k;
-    size_t where_in, where_out;
+    uchar valid = 1; 
+    int tmp, shape_2, i, j, k, tid, ws;
+    ulong where_in, where_out;
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
     
-    //This is local storage of voxels to be written
-    int last=0;
-    size_t index[STORAGE_SIZE];
-    float2 store[STORAGE_SIZE];
-    
-    
-    {
-        //Manual mask definition
+    //This is shared storage of voxels to be written
+    volatile local uint buckets[GROUPS];
+    volatile local ulong shared_indexes[BUCKET_SIZE*GROUPS];
+             local float shared_signal[BUCKET_SIZE*GROUPS];
+             local  uint shared_count[BUCKET_SIZE*GROUPS];
+    tid = get_local_id(1)+get_local_id(0)*get_local_size(1);
+    ws = get_local_size(1)*get_local_size(0);
+    for(i=0; i<GROUPS; i+=ws)
+    {//Memset the bucket counters
+        if (i+tid<GROUPS)
+            buckets[i+tid] = 0;
+    }
+        
+    barrier(CLK_LOCAL_MEM_FENCE);
+        
+    {//Manual mask definition
         int y = get_global_id(0),
             x = get_global_id(1);
         if ((x >= width) ||
@@ -227,11 +236,9 @@ kernel void regid_CDI(global float* image,
             ((x >= 307)&& (x <= 312)) ||
             ((y >= 278) && (y<=300) && (x>=276) && (x<=314)) ||
             ((y>=302) && (x>=276) && (x<=296)))
-            return;
+            valid = 0;
     }
     
-    if ((get_global_id(0)>=height) || (get_global_id(1)>=width))
-        return;
     
     where_in = width*get_global_id(0)+get_global_id(1);
     shape_2 = shape/2;
@@ -245,79 +252,72 @@ kernel void regid_CDI(global float* image,
     //dynamic masking
     value = image[where_in];
     if (value < -10.0f)
-        return;
+        valid = 0;
     else if (value <=0.0f)
         value= 0.0f;
     if (! isfinite(value)) 
-        return;
+        valid = 0;
     
     //Basic oversampling
-    for (int dr=0; dr<oversampling; dr++)
+    if (valid)
     {
-        float cos_phi, sin_phi, rphi;
-        rphi = (phi + (0.0f + dr)*delta*dphi) * M_PI_F/180.0f; 
-        cos_phi = cos(rphi);
-        sin_phi = sin(rphi);
-        Rx = (float3)(cos_phi, 0.0f, sin_phi);
-        Ry = (float3)(0.0f, 1.0f, 0.0f);
-        Rz = (float3)(-sin_phi, 0.0f, cos_phi);
-        for (i=0; i<oversampling; i++)
+        for (int dr=0; dr<oversampling; dr++)
         {
-            for (j=0; j<oversampling; j++)
+            float cos_phi, sin_phi, rphi;
+            rphi = (phi + (0.0f + dr)*delta*dphi) * M_PI_F/180.0f; 
+            cos_phi = cos(rphi);
+            sin_phi = sin(rphi);
+            Rx = (float3)(cos_phi, 0.0f, sin_phi);
+            Ry = (float3)(0.0f, 1.0f, 0.0f);
+            Rz = (float3)(-sin_phi, 0.0f, cos_phi);
+            for (i=0; i<oversampling; i++)
             {
-                pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
-                                get_global_id(0) + (j + 0.5f)*delta); 
-                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
-                
-                tmp = (int)recip.x + shape/2;
-                if ((tmp>=0) && (tmp<shape))
+                for (j=0; j<oversampling; j++)
                 {
-                    where_out = tmp;
-                    tmp = (int)recip.y + shape_2;
+                    pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
+                                    get_global_id(0) + (j + 0.5f)*delta); 
+                    recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+                    
+                    tmp = (int)recip.x + shape/2;
                     if ((tmp>=0) && (tmp<shape))
                     {
-                        where_out += tmp * shape;
-                        tmp = (int)recip.z + shape_2;
+                        where_out = tmp;
+                        tmp = (int)recip.y + shape_2;
                         if ((tmp>=0) && (tmp<shape))
                         {
-                            where_out += ((long)tmp) * shape * shape;                          
-//                            signal[where_out] += value;
-//                            norm[where_out] += 1.0f;
-                            
-                            //storage locally
-                            int found = 0;
-                            for (k=0; k<last; k++)
+                            where_out += tmp * shape;
+                            tmp = (int)recip.z + shape_2;
+                            if ((tmp>=0) && (tmp<shape))
                             {
-                                if (where_out == index[k])
-                                {
-                                        store[k] += (float2)(value, 1.0f);
-                                        found = 1;
-                                        k = last;
-                                }
+                                where_out += ((ulong)tmp) * shape * shape;                          
+                                
+                                //shared storage
+                                store_shared(where_out, value,
+                                             buckets, shared_indexes, shared_signal, shared_count);
                             }
-                            if (found == 0)
-                            {
-                                if (last >= STORAGE_SIZE)
-                                    printf("Too many voxels covered by pixel\n");
-                                else
-                                {
-                                    index[last] = where_out;
-                                    store[last] = (float2)(value, 1.0f);
-                                    last++;
-                                }
-                            }  
-                        }
-                    }               
-                }            
+                        }               
+                    }            
+                }
             }
         }
     }
+    
+    barrier(CLK_LOCAL_MEM_FENCE);
     // Finally we update the global memory with atomic writes
-    for (k=0; k<last; k++)
+    for (i=0; i<BUCKET_SIZE*GROUPS; k+=ws)
     {
-        atomic_add_global_float(&signal[index[k]], store[k].s0);
-        atomic_add(&norm[index[k]], (int)store[k].s1);
-        //signal[index[k]] += store[k].s0;
-        //norm[index[k]] += (int)store[k].s1;
+        if ((i+tid)<(BUCKET_SIZE*GROUPS))
+        {
+            int bucket = (i+tid)/BUCKET_SIZE;
+            int pos = (i+tid)%BUCKET_SIZE;
+            if (pos<buckets[bucket])
+            {   
+                int where = bucket*BUCKET_SIZE+pos;
+                ulong index = shared_indexes[where];
+                atomic_add_global_float(&signal[index], shared_signal[where]);
+                atomic_add(&norm[index], shared_count[where]);            
+            }
+            
+        }
     }
 }
