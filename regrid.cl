@@ -132,13 +132,14 @@ kernel void regid_CDI(global float* image,
                       const  float  pixel_size,
                       const  float  distance,
                       const  float  phi,
-                      const  float  dphi,
+                             float  dphi,
                       const  float  center_x,
                       const  float  center_y,
                       global float* signal,
                       global int*   norm,
                       const  int    shape,
-                      int    oversampling)
+                             int    oversampling_pixel,
+                             int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
     size_t where_in, where_out;
@@ -153,8 +154,10 @@ kernel void regid_CDI(global float* image,
     
     where_in = width*get_global_id(0)+get_global_id(1);
     shape_2 = shape/2;
-    oversampling = (oversampling<1?1:oversampling);
-    delta = 1.0f / oversampling;
+    oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
+    oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
+    delta = 1.0f / oversampling_pixel;
+    dphi /= oversampling_phi;
     
     { //Manual mask definition
         int y = get_global_id(0),
@@ -192,18 +195,18 @@ kernel void regid_CDI(global float* image,
 
     
     //Basic oversampling
-    for (int dr=0; dr<oversampling; dr++)
+    for (int dr=0; dr<oversampling_phi; dr++)
     {
         float cos_phi, sin_phi, rphi;
-        rphi = (phi + (0.0f + dr)*delta*dphi) * M_PI_F/180.0f; 
+        rphi = (phi + (0.0f + dr)*dphi) * M_PI_F/180.0f; 
         cos_phi = cos(rphi);
         sin_phi = sin(rphi);
         Rx = (float3)(cos_phi, 0.0f, sin_phi);
         Ry = (float3)(0.0f, 1.0f, 0.0f);
         Rz = (float3)(-sin_phi, 0.0f, cos_phi);
-        for (i=0; i<oversampling; i++)
+        for (i=0; i<oversampling_pixel; i++)
         {
-            for (j=0; j<oversampling; j++)
+            for (j=0; j<oversampling_pixel; j++)
             {
                 pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
                                 get_global_id(0) + (j + 0.5f)*delta); 

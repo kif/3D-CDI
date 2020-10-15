@@ -23,15 +23,15 @@ volume = (numpy.int32(568), numpy.int32(568), numpy.int32(568))
 center = (numpy.float32(284), numpy.float32(284))
 pixel_size = numpy.float32(55e-6)
 distance = numpy.float32(3.3)
-oversampling = numpy.int32(8)
+oversampling = numpy.int32(1)
+oversampling_phi = numpy.int32(1)
 dphi = numpy.float32(0.2)
-ldphi = numpy.linspace(0, 0.2, oversampling, endpoint=False, dtype=numpy.float32)
 dummy = numpy.float32(0.0)
 
 ctx = cl.create_some_context(interactive=False)
 queue = cl.CommandQueue(ctx)
 
-print(f"{nframes} frames of {shape},projected in a volume of {volume}, with an oversampling of {oversampling}.")
+print(f"{nframes} frames of {shape}, projected in a volume of {volume}, with an oversampling of {oversampling_phi}-{oversampling}-{oversampling}.")
 print(f"Working on device {ctx.devices[0].name}")
 
 with open("regrid.cl", "r") as f:
@@ -73,7 +73,8 @@ for j, i in enumerate(frames):
                             signal_d.data,
                             norm_d.data,
                             volume[0],
-                            oversampling)
+                            oversampling,
+                            oversampling_phi)
     pb.update(j)
 evt.wait()
 try:
@@ -84,10 +85,11 @@ except cl._cl.MemoryError:
 t1 = time.perf_counter()
 print(f"\nExecution time: {t1 - t0} s")
 
-with h5py.File("regrid_mask.h5", mode="w") as h:
+with h5py.File(f"regrid_mask-{oversampling_phi}-{oversampling}-{oversampling}.h5", mode="w") as h:
     h.create_dataset("SiO2msgel3",
             data=numpy.ascontiguousarray(volume_h, dtype=numpy.float32),
             # **hdf5plugin.Zfp(reversible=True))
             ** hdf5plugin.Bitshuffle())
-    h["oversampling"] = oversampling
+    h["oversampling_pixel"] = oversampling
+    h["oversampling_phi"] = oversampling_phi
     h["kernel"] = kernel_src
