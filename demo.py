@@ -31,8 +31,8 @@ dummy = numpy.float32(0.0)
 ctx = cl.create_some_context(interactive=False)
 queue = cl.CommandQueue(ctx)
 
-print(nframes, shape, volume, oversampling)
-print(ctx)
+print(f"{nframes} frames of {shape},projected in a volume of {volume}, with an oversampling of {oversampling}.")
+print(f"Working on device {ctx.devices[0].name}")
 
 with open("regrid.cl", "r") as f:
     kernel_src = f.read()
@@ -82,7 +82,7 @@ except cl._cl.MemoryError:
     volume_h = signal_d.get() / norm_d.get().astype(numpy.float32)
 
 t1 = time.perf_counter()
-print("Execution time: ", t1 - t0, "s")
+print(f"\nExecution time: {t1 - t0} s")
 
 with h5py.File("regrid_mask.h5", mode="w") as h:
     h.create_dataset("SiO2msgel3",
