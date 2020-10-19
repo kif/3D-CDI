@@ -124,11 +124,17 @@ kernel void regid_CDI_simple(global float* image,
     }
 }
 
+/*
+ * Regrid an image (heightxwidth) to a 3D volume (shape³) 
+ * 
+ * 
+ * 
+ */
+
 kernel void regid_CDI(global float* image,
                       global uchar* mask,
                       const  int    height,
                       const  int    width,
-                      const  float  dummy,
                       const  float  pixel_size,
                       const  float  distance,
                       const  float  phi,
@@ -217,6 +223,146 @@ kernel void regid_CDI(global float* image,
                         if ((tmp>=0) && (tmp<shape))
                         {
                             where_out += ((long)tmp) * shape * shape;                          
+                            
+                            //storage locally
+                            int found = 0;
+                            for (k=0; k<last; k++)
+                            {
+                                if (where_out == index[k])
+                                {
+                                        store[k] += (float2)(value, 1.0f);
+                                        found = 1;
+                                        k = last;
+                                }
+                            }
+                            if (found == 0)
+                            {
+                                if (last >= STORAGE_SIZE)
+                                    printf("Too many voxels covered by pixel\n");
+                                else
+                                {
+                                    index[last] = where_out;
+                                    store[last] = (float2)(value, 1.0f);
+                                    last++;
+                                }
+                            }  
+                        }
+                    }               
+                }            
+            }
+        }
+    }
+    // Finally we update the global memory with atomic writes
+    for (k=0; k<last; k++)
+    {
+        atomic_add_global_float(&signal[index[k]], store[k].s0);
+        atomic_add(&norm[index[k]], (int)store[k].s1);
+        //signal[index[k]] += store[k].s0;
+        //norm[index[k]] += (int)store[k].s1;
+    }
+}
+
+/*
+ * Regrid an image (heightxwidth) to a 3D volume (shape³) 
+ * 
+ * Slabed, store only data starting at slab_start <= z < slab_end
+ * 
+ */
+
+kernel void regid_CDI_slab(global float* image,
+                           global uchar* mask,
+                           const  int    height,
+                           const  int    width,
+                           const  float  pixel_size,
+                           const  float  distance,
+                           const  float  phi,
+                                  float  dphi,
+                           const  float  center_x,
+                           const  float  center_y,
+                           global float* signal,
+                           global int*   norm,
+                           const  int    shape,
+                           const  int    slab_start,
+                           const  int    slab_end,
+                                  int    oversampling_pixel,
+                                  int    oversampling_phi)
+{
+    int tmp, shape_2, i, j, k;
+    size_t where_in, where_out;
+    float value, delta;
+    float2 pos2, center = (float2)(center_x, center_y);
+    float3 Rx, Ry, Rz, recip;
+    
+    //This is local storage of voxels to be written
+    int last=0;
+    size_t index[STORAGE_SIZE];
+    float2 store[STORAGE_SIZE];
+    
+    where_in = width*get_global_id(0)+get_global_id(1);
+    shape_2 = shape/2;
+    oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
+    oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
+    delta = 1.0f / oversampling_pixel;
+    dphi /= oversampling_phi;
+    
+    { //Manual mask definition
+        int y = get_global_id(0),
+            x = get_global_id(1);
+        if ((x >= width) ||
+            (y >= height))
+            return;
+    }
+    { // static mask
+        if (mask[where_in])
+            return;
+    }
+    {//dynamic masking
+        value = image[where_in];
+        if (value < -10.0f)
+            return;
+        else if (value <=0.0f)
+            value= 0.0f;
+        if (! isfinite(value)) 
+            return;
+    }
+    
+
+    
+    // No oversampling for now
+    //this is the center of the pixel
+    //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
+
+    
+    //Basic oversampling
+    for (int dr=0; dr<oversampling_phi; dr++)
+    {
+        float cos_phi, sin_phi, rphi;
+        rphi = (phi + (0.0f + dr)*dphi) * M_PI_F/180.0f; 
+        cos_phi = cos(rphi);
+        sin_phi = sin(rphi);
+        Rx = (float3)(cos_phi, 0.0f, sin_phi);
+        Ry = (float3)(0.0f, 1.0f, 0.0f);
+        Rz = (float3)(-sin_phi, 0.0f, cos_phi);
+        for (i=0; i<oversampling_pixel; i++)
+        {
+            for (j=0; j<oversampling_pixel; j++)
+            {
+                pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
+                                get_global_id(0) + (j + 0.5f)*delta); 
+                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+                
+                tmp = convert_int_rtn(recip.x) + shape_2;
+                if ((tmp>=0) && (tmp<shape))
+                {
+                    where_out = tmp;
+                    tmp = convert_int_rtn(recip.y) + shape_2;
+                    if ((tmp>=0) && (tmp<shape))
+                    {
+                        where_out += tmp * shape;
+                        tmp = convert_int_rtn(recip.z) + shape_2;
+                        if ((tmp>=slab_start) && (tmp<slab_end))
+                        {
+                            where_out += ((long)(tmp-slab_start)) * shape * shape;                          
                             
                             //storage locally
                             int found = 0;

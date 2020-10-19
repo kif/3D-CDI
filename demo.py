@@ -5,7 +5,7 @@
 
 Regrid frames into 3D regular Fourier space
 """
-
+from math import ceil
 import numpy
 import pyopencl as cl
 from pyopencl import array as cla
@@ -52,7 +52,8 @@ def meas_phi(f):
 
 signal_d.fill(0.0)
 norm_d.fill(0)
-ws = (8, 4)
+ws = (32, 1)
+bs = [int(ceil(s / w) * w) for s, w in zip(shape, ws)]
 
 pb = ProgressBar("Projecting frames", nframes, 30)
 t0 = time.perf_counter()
@@ -61,11 +62,10 @@ for j, i in enumerate(frames):
     image_d.set(f.data)
     phi = meas_phi(f)
 #     for dphi in ldphi:
-    evt = prg.regid_CDI(queue, shape, ws,
+    evt = prg.regid_CDI(queue, bs, ws,
                             image_d.data,
                             mask_d.data,
                             * shape,
-                            dummy,
                             pixel_size,
                             distance,
                             phi, dphi,
