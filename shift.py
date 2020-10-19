@@ -19,7 +19,7 @@ fig, ax = subplots(2, 2)
 ax[0, 0].imshow(mdata)
 ax[0, 0].set_title(r"Input image #415 ($\phi=0$)")
 ax[0, 1].imshow(hdata)
-ax[0, 1].set_title("Regrid volume frame #284 (center)")
+ax[0, 1].set_title("Regrid slice #284 (center)")
 ax[1, 0].imshow(hdata - mdata)
 ax[1, 0].set_title("Difference")
 
