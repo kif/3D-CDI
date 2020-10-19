@@ -103,15 +103,15 @@ kernel void regid_CDI_simple(global float* image,
             recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
             value = image[where_in];
     
-            tmp = (int)recip.x + shape/2;
+            tmp = convert_int_rtn(recip.x) + shape_2;
             if ((tmp>=0) && (tmp<shape))
             {
                 where_out = tmp;
-                tmp = (int)recip.y + shape_2;
+                tmp = convert_int_rtn(recip.y) + shape_2;
                 if ((tmp>=0) && (tmp<shape))
                 {
                     where_out += tmp * shape;
-                    tmp = (int)recip.z + shape_2;
+                    tmp = convert_int_rtn(recip.z) + shape_2;
                     if ((tmp>=0) && (tmp<shape))
                     {
                         where_out += ((long)tmp) * shape * shape;  
@@ -165,13 +165,6 @@ kernel void regid_CDI(global float* image,
         if ((x >= width) ||
             (y >= height))
             return;
-//            (x <= 51)  ||
-//            (y <= 41)  ||                        
-//            ((y >= 297) && (y <= 302)) ||
-//            ((x >= 307)&& (x <= 312)) ||
-//            ((y >= 278) && (y<=300) && (x>=276) && (x<=314)) ||
-//            ((y>=302) && (x>=276) && (x<=296)))
-//            return;
     }
     { // static mask
         if (mask[where_in])
@@ -212,15 +205,15 @@ kernel void regid_CDI(global float* image,
                                 get_global_id(0) + (j + 0.5f)*delta); 
                 recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
                 
-                tmp = (int)recip.x + shape/2;
+                tmp = convert_int_rtn(recip.x) + shape_2;
                 if ((tmp>=0) && (tmp<shape))
                 {
                     where_out = tmp;
-                    tmp = (int)recip.y + shape_2;
+                    tmp = convert_int_rtn(recip.y) + shape_2;
                     if ((tmp>=0) && (tmp<shape))
                     {
                         where_out += tmp * shape;
-                        tmp = (int)recip.z + shape_2;
+                        tmp = convert_int_rtn(recip.z) + shape_2;
                         if ((tmp>=0) && (tmp<shape))
                         {
                             where_out += ((long)tmp) * shape * shape;                          
