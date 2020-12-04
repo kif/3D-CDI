@@ -269,7 +269,7 @@ class Regrid3D(OpenclProcessing):
         """
         # concatenate all needed source files into a single openCL module
         kernel_files = kernel_files or self.kernel_files
-        kernel_src = "\n", join(open(i).read() for i in kernel_files)
+        kernel_src = "\n".join(open(i).read() for i in kernel_files)
 
         compile_options = compile_options or self.get_compiler_options()
         logger.info("Compiling file %s with options %s", kernel_files, compile_options)
