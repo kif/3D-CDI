@@ -289,7 +289,7 @@ class Regrid3D(OpenclProcessing):
         Send image to the GPU
         """
         image_d = self.cl_mem["image"]
-        assert image.shape == image_shape
+        assert image.shape == self.image_shape
         assert image.dtype.type == numpy.float32
         image_d.set(image)
         self.profile_add(image_d.events[-1], "Copy image H --> D")
@@ -299,7 +299,7 @@ class Regrid3D(OpenclProcessing):
         Send mask to the GPU
         """
         mask_d = self.cl_mem["mask"]
-        assert mask_d.shape == image_shape
+        assert mask_d.shape == self.image_shape
         assert mask_d.dtype.type == numpy.int8
         mask_d.set(mask)
         self.profile_add(mask_d.events[-1], "Copy mask H --> D")
