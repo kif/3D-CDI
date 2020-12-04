@@ -254,7 +254,7 @@ class Regrid3D(OpenclProcessing):
 
     def calc_slabs(self):
         "Calculate the number of slabs needed to store data in the device's memory. The fewer, the faster"
-        device_mem = sel.device.memory
+        device_mem = self.device.memory
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
