@@ -245,7 +245,7 @@ class Regrid3D(OpenclProcessing):
                    BufferDescription("norm", (self.nb_slab,) + self.volume_shape[1:], numpy.int32, None),
                    ]
         self.allocate_buffers(buffers, use_array=True)
-        self.compile_kernels([os.path.abspath("regrid.cl")])
+        self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
         self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
                    "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
@@ -259,6 +259,26 @@ class Regrid3D(OpenclProcessing):
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
         nslab = int(ceil(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes)))
         return nslab
+
+    def compile_kernels(self, kernel_files=None, compile_options=None):
+        """Call the OpenCL compiler
+
+        :param kernel_files: list of path to the kernel
+            (by default use the one declared in the class)
+        :param compile_options: string of compile options
+        """
+        # concatenate all needed source files into a single openCL module
+        kernel_files = kernel_files or self.kernel_files
+        kernel_src = "\n", join(open(i).read() for i in kernel_files)
+
+        compile_options = compile_options or self.get_compiler_options()
+        logger.info("Compiling file %s with options %s", kernel_files, compile_options)
+        try:
+            self.program = pyopencl.Program(self.ctx, kernel_src).build(options=compile_options)
+        except (pyopencl.MemoryError, pyopencl.LogicError) as error:
+            raise MemoryError(error)
+        else:
+            self.kernels = KernelContainer(self.program)
 
     def send_image(self, image):
         """
