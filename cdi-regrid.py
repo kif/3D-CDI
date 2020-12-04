@@ -382,10 +382,11 @@ class Regrid3D(OpenclProcessing):
         size = self.slab_size * self.volume_shape[1] * self.volume_shape[2]
         wg = self.wg["memset_signal"]
         ts = int(ceil(size / wg)) * wg
-        evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
-                                            self.cl_mem["signal"].data,
-                                            self.cl_mem["norm"].data,
-                                            numpy.uint64(size))
+        print(wg, ts, size, self.slab_size, self.volume_shape)
+        evt = self.program.memset_signal(self.queue, (ts,), (wg,),
+                                         self.cl_mem["signal"].data,
+                                         self.cl_mem["norm"].data,
+                                         numpy.uint64(size))
         self.profile_add(evt, "Memset signal/count")
 
     def get_slab(self):
