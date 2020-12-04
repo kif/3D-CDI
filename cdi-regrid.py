@@ -202,7 +202,7 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1"):
                     continue
                 th = positioners[rotation][()]
                 ds = detector["data"]
-                print(entry.name, instrument.name, detector.name, ds)
+                print("Reading frame", detector.name, ds)
                 signal = numpy.ascontiguousarray(ds[0], dtype=numpy.float32)
                 if ds.shape[0] > 1:
                     signal -= numpy.ascontiguousarray(ds[1], dtype=numpy.float32)
@@ -398,6 +398,8 @@ def main():
     if isinstance(config, int):
         return config
     frames = {}
+    print("Regrid diffraction images in reciprocal space")
+
     t0 = time.perf_counter()
     for fn in config.images:
         frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len))
