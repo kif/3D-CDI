@@ -364,7 +364,7 @@ class Regrid3D(OpenclProcessing):
         oversampling_img = numpy.int32(oversampling_img)
         oversampling_rot = numpy.int32(oversampling_rot)
 
-        for angle, frame in frames:
+        for angle, frame in frames.items():
             callback(f"Project angle {angle}")
             self.project_one_frame(frame,
                                    angle, step,
@@ -439,9 +439,6 @@ def main():
     shape = config.shape
     if shape is None:
         shape = 512, 512, 512
-
-    for (j, v) in frames.items():
-        print(j, v.shape)
 
     regrid = Regrid3D(one_frame.shape,
                       shape,
