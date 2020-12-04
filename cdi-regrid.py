@@ -353,7 +353,7 @@ class Regrid3D(OpenclProcessing):
         callback("memset slab")
         self.clean_slab()
 
-        angles = numpy.array(frames.keys())
+        angles = numpy.array(list(frames.keys()))
         angles.sort()
         steps = angles[1:] - angles[:-1]
         step = numpy.float32(steps.min())
@@ -450,6 +450,7 @@ def main():
     slab_heigth = config.shape[0] // regrid.nb_slab
     for slab_start in numpy.arange(0, config.shape[0], slab_heigth, dtype=numpy.int32):
         slab_end = min(slab_start + slab_heigth, config.shape[0])
+        pb.title = "Projection onto slab %i-%i" % (slab_start, slab_end)
         slab = regrid.project_frames(frames,
                                      slab_start, slab_end,
                                      config.oversampling_img,
