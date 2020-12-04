@@ -136,7 +136,11 @@ def parse():
                        help="Name of the rotation motor")
     group.add_argument("--scan-len", type=str, dest="scan_len", default="1",
                        help="Pick scan which match that length (unless take all scans")
-
+    group = parser.add_argument_group("Oversampling options to reduces the moiré pattern")
+    group.add_argument("--oversampling-img", type=int, dest="oversampling_img", default=8,
+                       help="How many sub-pixel there are in one pixel (squared)")
+    group.add_argument("--oversampling-rot", type=int, dest="oversampling_rot", default=8,
+                       help="How many times a frame is projected")
     try:
         args = parser.parse_args()
 
