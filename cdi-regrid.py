@@ -239,7 +239,6 @@ class Regrid3D(OpenclProcessing):
         else:
             self.nb_slab = int(nb_slab)
         self.slab_size = int(self.volume_shape[0] / self.nb_slab)
-        print(self.nslab)
         buffers = [BufferDescription("image", image_shape, numpy.float32, None),
                    BufferDescription("mask", image_shape, numpy.int8, None),
                    BufferDescription("signal", (self.nb_slab,) + self.volume_shape[1:], numpy.float32, None),
