@@ -246,11 +246,10 @@ class Regrid3D(OpenclProcessing):
                    BufferDescription("norm", (self.nb_slab,) + self.volume_shape[1:], numpy.int32, None),
                    ]
         self.allocate_buffers(buffers, use_array=True)
-        self.wg = {"normalize_signal": self.check_workgroup_size("normalize_signal"),  # largest possible WG
-                   "memset_signal": self.check_workgroup_size("memset_signal"),  # largest possible WG
-                   "regid_CDI_slab": query_kernel_info(self.program,  # smallest readonnably possible
-                                                       kernel=self.kernels["regid_CDI_slab"],
-                                                       what="PREFERRED_WORK_GROUP_SIZE_MULTIPLE")}
+        self.compile_kernels(["regrid.cl"])
+        self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
+                   "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
+                   "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
         print(self.wg, self.nb_slab)
 
     def calc_slabs(self):
