@@ -428,7 +428,7 @@ def main():
 
     t0 = time.perf_counter()
     for fn in config.images:
-        frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback))
+        frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback=callback))
     read_time = time.perf_counter() - t0
 
     one_frame = frames[list(frames.keys())[0]]
