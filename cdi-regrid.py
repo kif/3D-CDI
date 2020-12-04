@@ -455,7 +455,7 @@ def main():
                       config.pixelsize,
                       profile=True,
                       platformid=pid,
-                      deviceis=did)
+                      deviceid=did)
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
     slab_heigth = config.shape[0] // regrid.nb_slab
