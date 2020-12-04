@@ -141,6 +141,9 @@ def parse():
                        help="How many sub-pixel there are in one pixel (squared)")
     group.add_argument("--oversampling-rot", type=int, dest="oversampling_rot", default=8,
                        help="How many times a frame is projected")
+    group = parser.add_argument_group("OpenCL options")
+    group.add_argument("--device", type=int, default=None, nargs=2,
+                       help="Platform and device ids")
     try:
         args = parser.parse_args()
 
@@ -433,19 +436,27 @@ def main():
     t0 = time.perf_counter()
     for fn in config.images:
         frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback=callback))
-    read_time = time.perf_counter() - t0
+    t1 - time.perf_counter()
 
     one_frame = frames[list(frames.keys())[0]]
     shape = config.shape
     if shape is None:
         shape = 512, 512, 512
 
+    if config.device is None:
+        pid, did = None, None
+    else:
+        pid, did = config.device
+
     regrid = Regrid3D(one_frame.shape,
                       shape,
                       config.beam,
                       config.distance,
                       config.pixelsize,
-                      profile=True)
+                      profile=True,
+                      platfromid=pid,
+                      deviceis=did)
+
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
     slab_heigth = config.shape[0] // regrid.nb_slab
     for slab_start in numpy.arange(0, config.shape[0], slab_heigth, dtype=numpy.int32):
