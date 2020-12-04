@@ -440,6 +440,9 @@ def main():
     if shape is None:
         shape = 512, 512, 512
 
+    for (j, v) in frames.items():
+        print(j, v.shape)
+
     regrid = Regrid3D(one_frame.shape,
                       shape,
                       config.beam,
