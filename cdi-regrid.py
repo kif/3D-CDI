@@ -19,6 +19,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 from math import ceil
 import numpy
+import pyopencl
 from pyopencl import array as cla
 import time
 import glob
