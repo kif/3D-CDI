@@ -1,6 +1,7 @@
 //Storage for that many voxel per pixel
 #define STORAGE_SIZE 64
 
+
 // Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
 {
@@ -399,5 +400,28 @@ kernel void regid_CDI_slab(global float* image,
         atomic_add(&norm[index[k]], (int)store[k].s1);
         //signal[index[k]] += store[k].s0;
         //norm[index[k]] += (int)store[k].s1;
+    }
+}
+
+
+/* Normalization kernel to be called at the very end of the processing
+ * 
+ * Basically it performs an implace normalization:
+ * 
+ * signal /= norm 
+ * 
+ * In this kernel: size = slab_size * shape_1 * shape_2 and is uint64!
+ * 
+ * This kernel is 1D and best run with the largest workgroup size possible
+ */
+
+kernel void normalize_signal(global float* signal,
+                             global int*   norm,                           
+                             const  unsigned long    size)
+{
+    size_t idx = get_global_id(0);
+    if (idx<size)
+    {
+        signal[idx] /= (float) norm[idx]; 
     }
 }
