@@ -320,7 +320,7 @@ class Regrid3D(OpenclProcessing):
         """
 
         self.send_image(frame)
-        ws = self.wg["regid_CDI_slab"]
+        wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
         evt = prg.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (ws, 1),
                                  image_d.data,
