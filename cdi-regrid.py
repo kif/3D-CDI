@@ -157,7 +157,7 @@ def parse():
         return args
 
 
-def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", callback=lambda a, b:None):
+def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", callback=lambda a, increment:None):
     """
     scan a file and search for scans suitable for  
     
