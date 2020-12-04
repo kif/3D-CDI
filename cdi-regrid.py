@@ -454,7 +454,7 @@ def main():
                       config.distance,
                       config.pixelsize,
                       profile=True,
-                      platfromid=pid,
+                      platformid=pid,
                       deviceis=did)
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
