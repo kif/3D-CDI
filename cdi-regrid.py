@@ -428,7 +428,7 @@ def main():
 
     t0 = time.perf_counter()
     for fn in config.images:
-        frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len))
+        frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback))
     read_time = time.perf_counter() - t0
 
     one_frame = frames[list(frames.keys())[0]]
@@ -446,7 +446,7 @@ def main():
     slab_heigth = config.shape[0] // regrid.nb_slab
     for slab_start in numpy.arange(0, config.shape[0], slab_heigth, dtype=numpy.int32):
         slab_end = min(slab_start + slab_heigth, config.shape[0])
-        slab = regrid.project_frames(self, frames,
+        slab = regrid.project_frames(frames,
                                      slab_start, slab_end,
                                      config.oversampling_img,
                                      config.oversampling_rot,
