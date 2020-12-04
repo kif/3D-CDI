@@ -157,7 +157,7 @@ def parse():
         return args
 
 
-def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1"):
+def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", callback=lambda a, b:None):
     """
     scan a file and search for scans suitable for  
     
@@ -200,9 +200,9 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1"):
                         break
                 else:
                     continue
+                callback(detector.name, increment=False)
                 th = positioners[rotation][()]
                 ds = detector["data"]
-                print("Reading frame", detector.name, ds)
                 signal = numpy.ascontiguousarray(ds[0], dtype=numpy.float32)
                 if ds.shape[0] > 1:
                     signal -= numpy.ascontiguousarray(ds[1], dtype=numpy.float32)
@@ -417,12 +417,19 @@ def main():
     if isinstance(config, int):
         return config
     frames = {}
-    print("Regrid diffraction images in reciprocal space")
+    print("Regrid diffraction images in 3D reciprocal space")
+
+    pb = ProgressBar("Reading frames", 100, 30)
+
+    def callback(msg, increment=True, cnt={"value": 0}):
+        if increment:
+            cnt["value"] += 1
+        pb.update(cnt["value"], msg, max_value)
 
     t0 = time.perf_counter()
     for fn in config.images:
         frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len))
-    print("Reading %s frames took %.3fs" % (len(frames), time.perf_counter() - t0))
+    read_time = time.perf_counter() - t0
 
     one_frame = frames[list(frames.keys())[0]]
     shape = config.shape
@@ -435,7 +442,16 @@ def main():
                       config.distance,
                       config.pixelsize,
                       profile=True)
-    pb = ProgressBar("Projecting frames", nframes, 30)
+    pb.max_value = (len(frames) + 2) * regrid.nb_slab
+    slab_heigth = config.shape[0] // regrid.nb_slab
+    for slab_start in numpy.arange(0, config.shape[0], slab_heigth, dtype=numpy.int32):
+        slab_end = min(slab_start + slab_heigth, config.shape[0])
+        slab = regrid.project_frames(self, frames,
+                                     slab_start, slab_end,
+                                     config.oversampling_img,
+                                     config.oversampling_rot,
+                                     callback)
+        print(slab.shape)
 
 
 def save_cxi(data, filename):
