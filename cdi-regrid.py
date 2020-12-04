@@ -424,7 +424,7 @@ def main():
     def callback(msg, increment=True, cnt={"value": 0}):
         if increment:
             cnt["value"] += 1
-        pb.update(cnt["value"], msg, max_value)
+        pb.update(cnt["value"], msg)
 
     t0 = time.perf_counter()
     for fn in config.images:
