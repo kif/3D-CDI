@@ -406,15 +406,15 @@ def main():
     print("Reading %s frames took %.3fs" % (len(frames), time.perf_counter() - t0))
 
     one_frame = frames[list(frames.keys())[0]]
-    shape = options.shape
+    shape = config.shape
     if shape is None:
         shape = 512, 512, 512
 
     regrid = Regrid3D(one_frame.shape,
                       shape,
-                      options.beam,
-                      options.distance,
-                      options.pixelsize,
+                      config.beam,
+                      config.distance,
+                      config.pixelsize,
                       profile=True)
     pb = ProgressBar("Projecting frames", nframes, 30)
 
