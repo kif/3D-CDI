@@ -406,13 +406,13 @@ kernel void regid_CDI_slab(global float* image,
 
 /* Normalization kernel to be called at the very end of the processing
  * 
- * Basically it performs an implace normalization:
+ * Basically it performs an inplace normalization:
  * 
  * signal /= norm 
  * 
  * In this kernel: size = slab_size * shape_1 * shape_2 and is uint64!
  * 
- * This kernel is 1D and best run with the largest workgroup size possible
+ * WG hint: 1D with the largest workgroup size possible
  */
 
 kernel void normalize_signal(global float* signal,
@@ -423,5 +423,27 @@ kernel void normalize_signal(global float* signal,
     if (idx<size)
     {
         signal[idx] /= (float) norm[idx]; 
+    }
+}
+
+/* Memset kernel called to empty the arrays 
+ * 
+ * signal[...]  = 0.0f
+ * norm[...] = 0 
+ * 
+ * In this kernel: size = slab_size * shape_1 * shape_2 and is uint64!
+ * 
+ * WG hint: 1D with the largest workgroup size possible
+ */
+
+kernel void normalize_signal(global float* signal,
+                             global int*   norm,                           
+                             const  unsigned long    size)
+{
+    size_t idx = get_global_id(0);
+    if (idx<size)
+    {
+        signal[idx] = 0.0f;
+        norm[idx] = 0;
     }
 }
