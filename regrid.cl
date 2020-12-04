@@ -1,6 +1,6 @@
 //Storage for that many voxel per pixel
 #define STORAGE_SIZE 64
-
+#include <stdint.h>
 
 // Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
@@ -417,9 +417,9 @@ kernel void regid_CDI_slab(global float* image,
 
 kernel void normalize_signal(global float* signal,
                              global int*   norm,                           
-                             const  unsigned long    size)
+                             const  uint64_t size)
 {
-    size_t idx = get_global_id(0);
+    uint64_t idx = get_global_id(0);
     if (idx<size)
     {
         signal[idx] /= (float) norm[idx]; 
@@ -438,9 +438,9 @@ kernel void normalize_signal(global float* signal,
 
 kernel void    memset_signal(global float* signal,
                              global int*   norm,                           
-                             const  unsigned long    size)
+                             const  uint64_t   size)
 {
-    size_t idx = get_global_id(0);
+    uint64_t idx = get_global_id(0);
     if (idx<size)
     {
         signal[idx] = 0.0f;
