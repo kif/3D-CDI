@@ -27,7 +27,7 @@ import fabio
 import h5py
 import hdf5plugin
 from pyFAI.utils.shell import ProgressBar
-from silx.opencl.processing import OpenclProcessing, BufferDescription
+from silx.opencl.processing import OpenclProcessing, BufferDescription, KernelContainer
 from silx.opencl.common import query_kernel_info
 import argparse
 
