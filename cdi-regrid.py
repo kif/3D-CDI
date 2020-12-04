@@ -288,7 +288,7 @@ class Regrid3D(OpenclProcessing):
         """
         Send image to the GPU
         """
-        image_d = self.buffers["image"]
+        image_d = self.cl_mem["image"]
         assert image.shape == image_shape
         assert image.dtype.type == numpy.float32
         image_d.set(image)
@@ -298,7 +298,7 @@ class Regrid3D(OpenclProcessing):
         """
         Send mask to the GPU
         """
-        mask_d = self.buffers["mask"]
+        mask_d = self.cl_mem["mask"]
         assert mask_d.shape == image_shape
         assert mask_d.dtype.type == numpy.int8
         mask_d.set(mask)
@@ -330,8 +330,8 @@ class Regrid3D(OpenclProcessing):
                                  self.distance,
                                  rot, d_rot,
                                  *self.center,
-                                 self.buffers["signal"].data,
-                                 self.buffers["norm"],
+                                 self.cl_mem["signal"].data,
+                                 self.cl_mem["norm"].data,
                                  self.volume_shape[-1],
                                  slab_start,
                                  slab_end,
@@ -380,8 +380,8 @@ class Regrid3D(OpenclProcessing):
         wg = self.wg["memset_signal"]
         ts = int(ceil(size / wg)) * wg
         evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
-                                            self.buffers["signal"].data,
-                                            self.buffers["norm"].data,
+                                            self.cl_mem["signal"].data,
+                                            self.cl_mem["norm"].data,
                                             numpy.uint64(size))
         self.profile_add(evt, "Memset signal/count")
 
@@ -394,13 +394,13 @@ class Regrid3D(OpenclProcessing):
         size = self.slab_size * self.volume_shape[1] * self.volume_shape[2]
         wg = self.wg["normalize_signal"]
         ts = int(ceil(size / wg)) * wg
-        signal = self.buffers["signal"].data
+        signal = self.cl_mem["signal"].data
         evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
                                             signal,
-                                            self.buffers["norm"].data,
+                                            self.cl_mem["norm"].data,
                                             numpy.uint64(size))
         self.profile_add(evt, "Normalization signal/count")
-        result = self.buffers["signal"].get()
+        result = self.cl_mem["signal"].get()
         self.profile_add(signal.events[-1], "Copy slab D --> H")
         return result
 
