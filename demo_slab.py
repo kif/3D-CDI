@@ -30,7 +30,7 @@ dphi = numpy.float32(0.2)
 nb_slab = 32
 slab_heigth = numpy.int32((volume[0] / nb_slab) + 1)
 
-ws = (32, 1)
+ws = (8, 4)
 bs = [int(ceil(s / w) * w) for s, w in zip(shape, ws)]
 
 ctx = cl.create_some_context(interactive=False)
