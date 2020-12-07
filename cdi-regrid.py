@@ -267,7 +267,9 @@ class Regrid3D(OpenclProcessing):
         # Limit one slab to 2^32 in size ?
         # int(ceil((1 << 32) / numpy.prod(self.volume_shape)))
 
-        device_mem = self.device.memory
+        # Limit one slab to the maximum allocatable memory
+
+        device_mem = self.ctx.devices[0].max_mem_alloc_size
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
