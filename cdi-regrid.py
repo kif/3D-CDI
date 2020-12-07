@@ -249,8 +249,8 @@ class Regrid3D(OpenclProcessing):
         self.slab_size = int(self.volume_shape[0] / self.nb_slab)
         buffers = [BufferDescription("image", image_shape, numpy.float32, None),
                    BufferDescription("mask", image_shape, numpy.int8, None),
-                   BufferDescription("signal", (self.nb_slab,) + self.volume_shape[1:], numpy.float32, None),
-                   BufferDescription("norm", (self.nb_slab,) + self.volume_shape[1:], numpy.int32, None),
+                   BufferDescription("signal", (self.slab_size,) + self.volume_shape[1:], numpy.float32, None),
+                   BufferDescription("norm", (self.slab_size,) + self.volume_shape[1:], numpy.int32, None),
                    ]
         self.allocate_buffers(buffers, use_array=True)
         self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
