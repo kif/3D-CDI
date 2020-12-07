@@ -439,7 +439,7 @@ def main():
     frames = {}
     print("Regrid diffraction images in 3D reciprocal space")
 
-    mask = fabio.open(config.mask.data)
+    mask = fabio.open(config.mask).data
     one_frame = frames[list(frames.keys())[0]]
     shape = config.shape
     if shape is None:
