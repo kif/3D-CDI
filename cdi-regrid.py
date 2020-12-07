@@ -308,6 +308,7 @@ class Regrid3D(OpenclProcessing):
         """
         image_d = self.cl_mem["image"]
         assert image.shape == self.image_shape
+        image_d.set(numpy.ascontiguousarray(image, dtype=numpy.float32))
         self.profile_add(image_d.events[-1], "Copy image H --> D")
 
     def send_mask(self, mask):
