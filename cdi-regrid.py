@@ -418,7 +418,10 @@ class Regrid3D(OpenclProcessing):
                                             numpy.uint64(size))
         self.profile_add(evt, "Normalization signal/count")
         result = signal_d.get()
-        self.profile_add(signal_d.events[-1], "Copy slab D --> H")
+        if signal_d.events:
+            self.profile_add(signal_d.events[-1], "Copy slab D --> H")
+        else:
+            print("no evt ? ", signal_d.events)
         return result
 
 
