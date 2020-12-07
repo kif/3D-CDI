@@ -338,21 +338,21 @@ class Regrid3D(OpenclProcessing):
         self.send_image(frame)
         wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
-        evt = prg.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (ws, 1),
-                                 image_d.data,
-                                 mask_d.data,
-                                 * self.image_shape,
-                                 self.pixel_size,
-                                 self.distance,
-                                 rot, d_rot,
-                                 *self.center,
-                                 self.cl_mem["signal"].data,
-                                 self.cl_mem["norm"].data,
-                                 self.volume_shape[-1],
-                                 slab_start,
-                                 slab_end,
-                                 oversampling_img,
-                                 oversampling_rot)
+        evt = self.program.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (ws, 1),
+                                          image_d.data,
+                                          mask_d.data,
+                                          * self.image_shape,
+                                          self.pixel_size,
+                                          self.distance,
+                                          rot, d_rot,
+                                          *self.center,
+                                          self.cl_mem["signal"].data,
+                                          self.cl_mem["norm"].data,
+                                          self.volume_shape[-1],
+                                          slab_start,
+                                          slab_end,
+                                          oversampling_img,
+                                          oversampling_rot)
         self.profile_add(evt, "Projection onto slab")
 
     def project_frames(self, frames,
@@ -401,7 +401,6 @@ class Regrid3D(OpenclProcessing):
                                          self.cl_mem["norm"].data,
                                          numpy.uint64(size))
         self.profile_add(evt, "Memset signal/count")
-        evt.wait()
 
     def get_slab(self):
         """

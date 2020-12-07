@@ -435,9 +435,9 @@ kernel void normalize_signal(global float* signal,
  * WG hint: 1D with the largest workgroup size possible
  */
 
-kernel void    memset_signal(global float* signal,
-                             global int*   norm,                           
-                             const  size_t   size)
+kernel void  memset_signal(global float* signal,
+                           global int*   norm,                           
+                           const  size_t   size)
 {
     size_t idx = get_global_id(0);
     if (idx<size)
