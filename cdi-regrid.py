@@ -252,6 +252,7 @@ class Regrid3D(OpenclProcessing):
                    BufferDescription("signal", (self.slab_size,) + self.volume_shape[1:], numpy.float32, None),
                    BufferDescription("norm", (self.slab_size,) + self.volume_shape[1:], numpy.int32, None),
                    ]
+        print(buffers)
         self.allocate_buffers(buffers, use_array=True)
         self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
         self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
