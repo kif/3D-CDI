@@ -236,7 +236,7 @@ class Regrid3D(OpenclProcessing):
         """
         OpenclProcessing.__init__(self, ctx=None, devicetype=devicetype, platformid=platformid, deviceid=deviceid,
                                   block_size=block_size, memory=memory, profile=profile)
-        mask = numpy.ascontiguousarray(mask, dtype=numpy.int8)
+
         self.image_shape = tuple(numpy.int32(i) for i in mask.shape)
         self.volume_shape = tuple(numpy.int32(i) for i in volume_shape[:3])
         self.center = tuple(numpy.float32(i) for i in center[:2])
@@ -260,7 +260,7 @@ class Regrid3D(OpenclProcessing):
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
                    "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
         print(self.wg, self.nb_slab)
-        self.send_mask(self.mask)
+        self.send_mask(mask)
 
     def calc_slabs(self):
         "Calculate the number of slabs needed to store data in the device's memory. The fewer, the faster"
