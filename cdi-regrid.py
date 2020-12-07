@@ -339,8 +339,8 @@ class Regrid3D(OpenclProcessing):
         wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
         evt = self.program.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (wg, 1),
-                                          image_d.data,
-                                          mask_d.data,
+                                          self.cl_mem["image"].data,
+                                          self.cl_mem["mask"].data,
                                           * self.image_shape,
                                           self.pixel_size,
                                           self.distance,
