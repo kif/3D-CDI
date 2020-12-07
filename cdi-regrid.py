@@ -112,7 +112,7 @@ def parse():
 #                        " option)")
     group.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
                        help="do everything except modifying the file system")
-    group.add_argument("--mask", dest="mask", type=str, default=None,
+    group.add_argument("-m", "--mask", dest="mask", type=str, default=None,
 				       help="Path for the mask file containing both invalid pixels and beam-stop shadow")
 
     group = parser.add_argument_group("Experimental setup options")
