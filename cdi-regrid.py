@@ -237,7 +237,7 @@ class Regrid3D(OpenclProcessing):
         OpenclProcessing.__init__(self, ctx=None, devicetype=devicetype, platformid=platformid, deviceid=deviceid,
                                   block_size=block_size, memory=memory, profile=profile)
         mask = numpy.ascontiguousarray(mask, dtype=numpy.int8)
-        self.image_shape = tuple(numpy.int32(i) for i in self.mask.shape)
+        self.image_shape = tuple(numpy.int32(i) for i in mask.shape)
         self.volume_shape = tuple(numpy.int32(i) for i in volume_shape[:3])
         self.center = tuple(numpy.float32(i) for i in center[:2])
         self.pixel_size = numpy.float32(pixel_size)
