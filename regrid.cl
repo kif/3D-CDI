@@ -1,6 +1,5 @@
 //Storage for that many voxel per pixel
 #define STORAGE_SIZE 64
-#include <stdint.h>
 
 // Function to perform an atom addition in global memory (does not exist in OpenCL)
 inline void atomic_add_global_float(volatile global float *addr, float val)
@@ -69,7 +68,7 @@ kernel void regid_CDI_simple(global float* image,
                                     int    oversampling)
 {
     int tmp, shape_2, i, j, k;
-    uint64_t where_in, where_out;
+    size_t where_in, where_out;
     float value, cos_phi, sin_phi, delta, start;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
@@ -149,14 +148,14 @@ kernel void regid_CDI(global float* image,
                              int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
-    uint64_t where_in, where_out;
+    size_t where_in, where_out;
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
     
     //This is local storage of voxels to be written
     int last=0;
-    uint64_t index[STORAGE_SIZE];
+    size_t index[STORAGE_SIZE];
     float2 store[STORAGE_SIZE];
     
     where_in = width*get_global_id(0)+get_global_id(1);
@@ -289,14 +288,14 @@ kernel void regid_CDI_slab(global float* image,
                                   int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
-    uint64_t where_in, where_out;
+    size_t where_in, where_out;
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
     
     //This is local storage of voxels to be written
     int last=0;
-    uint64_t index[STORAGE_SIZE];
+    size_t index[STORAGE_SIZE];
     float2 store[STORAGE_SIZE];
     
     where_in = width*get_global_id(0)+get_global_id(1);
@@ -417,9 +416,9 @@ kernel void regid_CDI_slab(global float* image,
 
 kernel void normalize_signal(global float* signal,
                              global int*   norm,                           
-                             const  uint64_t size)
+                             const  size_t size)
 {
-    uint64_t idx = get_global_id(0);
+    size_t idx = get_global_id(0);
     if (idx<size)
     {
         signal[idx] /= (float) norm[idx]; 
@@ -438,9 +437,9 @@ kernel void normalize_signal(global float* signal,
 
 kernel void    memset_signal(global float* signal,
                              global int*   norm,                           
-                             const  uint64_t   size)
+                             const  size_t   size)
 {
-    uint64_t idx = get_global_id(0);
+    size_t idx = get_global_id(0);
     if (idx<size)
     {
         signal[idx] = 0.0f;
