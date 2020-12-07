@@ -491,7 +491,7 @@ def main():
                                      callback)
         full_volume[slab_start:slab_end] = slab
     t2 = time.perf_counter()
-    save_cxi(data, config):
+    save_cxi(data, config)
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
@@ -499,18 +499,18 @@ def main():
         print(f"Frame reading: {t1 - t0:6.3s}s for {len(frames)} frames")
         print(f"Projection time: {t2 - t1:6.3s}s using {regrid.nb_slab} slabs")
         print(f"Save time: {t3 - t2:6.3s}s")
-    
-    
+
+
 def save_cxi(data, config):
-    save_cdi_data_cxi(config.output, data, 
-                      wavelength=None, 
-                      detector_distance=config.distance, 
-                      pixel_size_detector=config.pixelsize, 
+    save_cdi_data_cxi(config.output, data,
+                      wavelength=None,
+                      detector_distance=config.distance,
+                      pixel_size_detector=config.pixelsize,
                       mask=mask,
-                      sample_name=None, 
-                      experiment_id=None, 
-                      instrument=None, 
-                      note=None, 
+                      sample_name=None,
+                      experiment_id=None,
+                      instrument=None,
+                      note=None,
                       iobs_is_fft_shifted=False,
                       process_parameters=None)
 
