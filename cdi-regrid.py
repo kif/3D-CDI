@@ -499,8 +499,8 @@ def main():
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
         print("#"*50)
-        print(f"Frame reading: {t1 - t0:6.3s}s for {len(frames)} frames")
-        print(f"Projection time: {t2 - t1:6.3s}s using {regrid.nb_slab} slabs")
+        print(f"Frame reading: {t1 - t0:6.3f}s for {len(frames)} frames")
+        print(f"Projection time: {t2 - t1:6.3f}s using {regrid.nb_slab} slabs")
         print(f"Save time: {t3 - t2:6.3f}s")
 
 
