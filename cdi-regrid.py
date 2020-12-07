@@ -214,6 +214,7 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", c
                 if ds.shape[0] > 1:
                     signal -= numpy.ascontiguousarray(ds[1], dtype=numpy.float32)
                 res[th] = signal
+                if len (res) > 10: break
     return res
 
 
