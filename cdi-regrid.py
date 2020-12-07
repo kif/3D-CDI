@@ -88,9 +88,11 @@ def parse():
     group.add_argument("-o", "--output", default='reciprocal_volume.cxi', type=str,
                        help="output filename in CXI format")
     group.add_argument("-s", "--shape", default=None, type=int, nargs=3,
-                       help="Size of the reciprocal volume, by default 512³")
+                       help="Size of the reciprocal volume (3 int), by default 512³")
 #     group.add_argument("-D", "--dummy", type=float, default=numpy.nan,
 #                        help="Set masked values to this dummy value")
+    group.add_argument("-m", "--mask", dest="mask", type=str, default=None,
+                       help="Path for the mask file containing both invalid pixels and beam-stop shadow")
 
     group = parser.add_argument_group("optional behaviour arguments")
 #     group.add_argument("-f", "--force", dest="force", action="store_true", default=False,
@@ -112,8 +114,6 @@ def parse():
 #                        " option)")
     group.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
                        help="do everything except modifying the file system")
-    group.add_argument("-m", "--mask", dest="mask", type=str, default=None,
-				       help="Path for the mask file containing both invalid pixels and beam-stop shadow")
 
     group = parser.add_argument_group("Experimental setup options")
 #     group.add_argument("-e", "--energy", type=float, default=None,
@@ -226,7 +226,7 @@ class Regrid3D(OpenclProcessing):
                  ctx=None, devicetype="all", platformid=None, deviceid=None,
                  block_size=None, memory=None, profile=False):
         """
-        :param image_shape: 2-tuple of int
+        :param mask: numpy array with the mask: needs to be of the same shape as the image
         :param volume_shape: 3-tuple of int
         :param center: 2-tuple of float (y,x)
         :param pixel_size: float
@@ -236,7 +236,8 @@ class Regrid3D(OpenclProcessing):
         """
         OpenclProcessing.__init__(self, ctx=None, devicetype=devicetype, platformid=platformid, deviceid=deviceid,
                                   block_size=block_size, memory=memory, profile=profile)
-        self.image_shape = tuple(numpy.int32(i) for i in image_shape[:2])
+        mask = numpy.ascontiguousarray(mask, dtype=numpy.int8)
+        self.image_shape = tuple(numpy.int32(i) for i in self.mask.shape)
         self.volume_shape = tuple(numpy.int32(i) for i in volume_shape[:3])
         self.center = tuple(numpy.float32(i) for i in center[:2])
         self.pixel_size = numpy.float32(pixel_size)
@@ -259,6 +260,7 @@ class Regrid3D(OpenclProcessing):
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
                    "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
         print(self.wg, self.nb_slab)
+        self.send_mask(self.mask)
 
     def calc_slabs(self):
         "Calculate the number of slabs needed to store data in the device's memory. The fewer, the faster"
@@ -306,8 +308,6 @@ class Regrid3D(OpenclProcessing):
         """
         image_d = self.cl_mem["image"]
         assert image.shape == self.image_shape
-        assert image.dtype.type == numpy.float32
-        image_d.set(image)
         self.profile_add(image_d.events[-1], "Copy image H --> D")
 
     def send_mask(self, mask):
@@ -316,8 +316,7 @@ class Regrid3D(OpenclProcessing):
         """
         mask_d = self.cl_mem["mask"]
         assert mask_d.shape == self.image_shape
-        assert mask_d.dtype.type == numpy.int8
-        mask_d.set(mask)
+        image_d.set(numpy.ascontiguousarray(mask, dtype=numpy.int8))
         self.profile_add(mask_d.events[-1], "Copy mask H --> D")
 
     def project_one_frame(self, frame,
@@ -338,7 +337,7 @@ class Regrid3D(OpenclProcessing):
         self.send_image(frame)
         wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
-        evt = self.program.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (ws, 1),
+        evt = self.program.regid_CDI_slab(self.queue, (ts, self.image_shape[0]) , (wg, 1),
                                           image_d.data,
                                           mask_d.data,
                                           * self.image_shape,
@@ -440,6 +439,27 @@ def main():
     frames = {}
     print("Regrid diffraction images in 3D reciprocal space")
 
+    mask = fabio.open(config.mask.data)
+    one_frame = frames[list(frames.keys())[0]]
+    shape = config.shape
+    if shape is None:
+        shape = 512, 512, 512
+
+    if config.device is None:
+        pid, did = None, None
+    else:
+        pid, did = config.device
+
+    regrid = Regrid3D(mask,
+                      shape,
+                      config.beam,
+                      config.distance,
+                      config.pixelsize,
+                      profile=True,
+                      platformid=pid,
+                      deviceid=did)
+
+    print("Working on device", regrid.device.name)
     pb = ProgressBar("Reading frames", 100, 30)
 
     def callback(msg, increment=True, cnt={"value": 0}):
@@ -451,25 +471,6 @@ def main():
     for fn in config.images:
         frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback=callback))
     t1 = time.perf_counter()
-
-    one_frame = frames[list(frames.keys())[0]]
-    shape = config.shape
-    if shape is None:
-        shape = 512, 512, 512
-
-    if config.device is None:
-        pid, did = None, None
-    else:
-        pid, did = config.device
-
-    regrid = Regrid3D(one_frame.shape,
-                      shape,
-                      config.beam,
-                      config.distance,
-                      config.pixelsize,
-                      profile=True,
-                      platformid=pid,
-                      deviceid=did)
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
     slab_heigth = config.shape[0] // regrid.nb_slab
