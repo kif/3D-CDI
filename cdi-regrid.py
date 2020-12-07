@@ -275,7 +275,7 @@ class Regrid3D(OpenclProcessing):
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
-        nslab = max(nslab, int(ceil(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
+        nslab = max(nslab, int(round(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
         print(nslab)
         # Limit one slab to the maximum allocatable memory
         device_mem = self.ctx.devices[0].max_mem_alloc_size
