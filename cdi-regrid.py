@@ -222,7 +222,7 @@ class Regrid3D(OpenclProcessing):
     "Project a 2D frame to a 3D volume taking into account the curvature of the Ewald's sphere"
     kernel_files = ["regrid.cl"]
 
-    def __init__(self, image_shape, volume_shape, center, pixel_size, distance, nb_slab=None,
+    def __init__(self, mask, volume_shape, center, pixel_size, distance, nb_slab=None,
                  ctx=None, devicetype="all", platformid=None, deviceid=None,
                  block_size=None, memory=None, profile=False):
         """
