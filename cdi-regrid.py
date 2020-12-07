@@ -29,6 +29,8 @@ import hdf5plugin
 from pyFAI.utils.shell import ProgressBar
 from silx.opencl.processing import OpenclProcessing, BufferDescription, KernelContainer
 from silx.opencl.common import query_kernel_info
+from pynx.cdi.cdi import save_cdi_data_cxi
+
 import argparse
 
 logger = logging.getLogger("preprocess_cdi")
@@ -453,6 +455,8 @@ def main():
     else:
         pid, did = config.device
 
+    full_volume = numpy.zeros(shape, dtype=numpy.float32)
+
     regrid = Regrid3D(mask,
                       shape,
                       config.beam,
@@ -485,18 +489,30 @@ def main():
                                      config.oversampling_img,
                                      config.oversampling_rot,
                                      callback)
-        print(slab.shape)
+        full_volume[slab_start:slab_end] = slab
     t2 = time.perf_counter()
-
+    save_cxi(data, config):
+    t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
         print("#"*50)
-        print(f"Frame reading: {t1 - t0}s for {len(frames)} frames")
-        print(f"Projection time: {t2 - t1}s using {regrid.nb_slab} slabs")
-
-
-def save_cxi(data, filename):
-    pass
+        print(f"Frame reading: {t1 - t0:6.3s}s for {len(frames)} frames")
+        print(f"Projection time: {t2 - t1:6.3s}s using {regrid.nb_slab} slabs")
+        print(f"Save time: {t3 - t2:6.3s}s")
+    
+    
+def save_cxi(data, config):
+    save_cdi_data_cxi(config.output, data, 
+                      wavelength=None, 
+                      detector_distance=config.distance, 
+                      pixel_size_detector=config.pixelsize, 
+                      mask=mask,
+                      sample_name=None, 
+                      experiment_id=None, 
+                      instrument=None, 
+                      note=None, 
+                      iobs_is_fft_shifted=False,
+                      process_parameters=None)
 
 
 if __name__ == "__main__":
