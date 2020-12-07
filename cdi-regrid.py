@@ -271,18 +271,18 @@ class Regrid3D(OpenclProcessing):
         nslab = 1
         # Limit one slab to 2^32 in size ?
         # int(ceil((1 << 32) / numpy.prod(self.volume_shape)))
-        print(nslab)
+#         print(nslab)
         device_mem = self.device.memory
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
         nslab = max(nslab, int(round(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
-        print(nslab)
+#         print(nslab)
         # Limit one slab to the maximum allocatable memory
         device_mem = self.ctx.devices[0].max_mem_alloc_size
         volume_nbytes = numpy.prod(self.volume_shape) * 4
         nslab = max(nslab, int(ceil(volume_nbytes / device_mem)))
-        print(nslab)
+#         print(nslab)
         return nslab
 
     def compile_kernels(self, kernel_files=None, compile_options=None):
@@ -469,7 +469,7 @@ def main():
                       platformid=pid,
                       deviceid=did)
 
-    print("Working on device", regrid.device.name)
+#     print("Working on device", regrid.device.name)
     pb = ProgressBar("Reading frames", 100, 30)
 
     def callback(msg, increment=True, cnt={"value": 0}):
@@ -494,7 +494,7 @@ def main():
                                      callback)
         full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
-    save_cxi(full_volume, config)
+    save_cxi(full_volume, config, mask=mask)
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
@@ -504,7 +504,7 @@ def main():
         print(f"Save time: {t3 - t2:6.3s}s")
 
 
-def save_cxi(data, config):
+def save_cxi(data, config, mask=None):
     save_cdi_data_cxi(config.output, data,
                       wavelength=None,
                       detector_distance=config.distance,
