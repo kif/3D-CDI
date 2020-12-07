@@ -69,7 +69,7 @@ kernel void regid_CDI_simple(global float* image,
                                     int    oversampling)
 {
     int tmp, shape_2, i, j, k;
-    size_t where_in, where_out;
+    uint64_t where_in, where_out;
     float value, cos_phi, sin_phi, delta, start;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
@@ -149,14 +149,14 @@ kernel void regid_CDI(global float* image,
                              int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
-    size_t where_in, where_out;
+    uint64_t where_in, where_out;
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
     
     //This is local storage of voxels to be written
     int last=0;
-    size_t index[STORAGE_SIZE];
+    uint64_t index[STORAGE_SIZE];
     float2 store[STORAGE_SIZE];
     
     where_in = width*get_global_id(0)+get_global_id(1);
@@ -289,14 +289,14 @@ kernel void regid_CDI_slab(global float* image,
                                   int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
-    size_t where_in, where_out;
+    uint64_t where_in, where_out;
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
     
     //This is local storage of voxels to be written
     int last=0;
-    size_t index[STORAGE_SIZE];
+    uint64_t index[STORAGE_SIZE];
     float2 store[STORAGE_SIZE];
     
     where_in = width*get_global_id(0)+get_global_id(1);

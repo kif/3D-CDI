@@ -11,7 +11,7 @@ __author__ = "Jérôme Kieffer"
 __copyright__ = "2020 ESRF"
 __license__ = "MIT"
 __version__ = "0.1"
-__date__ = "04/12/2020"
+__date__ = "07/12/2020"
 
 import os
 import sys
@@ -260,11 +260,17 @@ class Regrid3D(OpenclProcessing):
 
     def calc_slabs(self):
         "Calculate the number of slabs needed to store data in the device's memory. The fewer, the faster"
+
+        nslab = 1
+        # Limit one slab to 2^32 in size ?
+        # int(ceil((1 << 32) / numpy.prod(self.volume_shape)))
+
         device_mem = self.device.memory
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
-        nslab = int(ceil(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes)))
+        nslab = max(nslab, int(ceil(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
+
         return nslab
 
     def compile_kernels(self, kernel_files=None, compile_options=None):
