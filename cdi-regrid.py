@@ -270,18 +270,18 @@ class Regrid3D(OpenclProcessing):
         nslab = 1
         # Limit one slab to 2^32 in size ?
         # int(ceil((1 << 32) / numpy.prod(self.volume_shape)))
-
+        print(nslab)
         device_mem = self.device.memory
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
         volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
         nslab = max(nslab, int(ceil(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
-
+        print(nslab)
         # Limit one slab to the maximum allocatable memory
         device_mem = self.ctx.devices[0].max_mem_alloc_size
         volume_nbytes = numpy.prod(self.volume_shape) * 4
         nslab = max(nslab, int(ceil(volume_nbytes / device_mem)))
-
+        print(nslab)
         return nslab
 
     def compile_kernels(self, kernel_files=None, compile_options=None):
@@ -371,10 +371,11 @@ class Regrid3D(OpenclProcessing):
         callback("memset slab")
         self.clean_slab()
 
-        angles = numpy.array(list(frames.keys()))
+        angles = list(frames.keys())
         angles.sort()
-        steps = angles[1:] - angles[:-1]
-        step = numpy.float32(steps.min())
+        nangles = numpy.array(angles, dtype=numpy.float32)
+        steps = nangles[1:] - nangles[:-1]
+        step = steps.min()
         if slab_end - slab_start > self.slab_size:
             raise RuntimeError("Too many data to fit into memory")
         slab_start = numpy.int32(slab_start)
@@ -382,10 +383,11 @@ class Regrid3D(OpenclProcessing):
         oversampling_img = numpy.int32(oversampling_img)
         oversampling_rot = numpy.int32(oversampling_rot)
 
-        for angle, frame in frames.items():
-            callback(f"Project angle {angle}")
+        for angle, nangle in zip(frames.keys(), nangles):
+            callback(f"Project angle {angle:.1f}")
+            frame = frames[angle]
             self.project_one_frame(frame,
-                                   numpy.float32(angle), step,
+                                   nangle, step,
                                    slab_start, slab_end,
                                    oversampling_img, oversampling_rot)
 
@@ -489,7 +491,7 @@ def main():
                                      config.oversampling_img,
                                      config.oversampling_rot,
                                      callback)
-        full_volume[slab_start:slab_end] = slab
+        full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
     save_cxi(data, config)
     t3 = time.perf_counter()
