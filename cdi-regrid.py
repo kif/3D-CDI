@@ -249,20 +249,20 @@ class Regrid3D(OpenclProcessing):
             self.nb_slab = self.calc_slabs()
         else:
             self.nb_slab = int(ceil(nb_slab))
-        print(self.nb_slab)
+#         print(self.nb_slab)
         self.slab_size = int(self.volume_shape[0] / self.nb_slab)
         buffers = [BufferDescription("image", self.image_shape, numpy.float32, None),
                    BufferDescription("mask", self.image_shape, numpy.int8, None),
                    BufferDescription("signal", (self.slab_size,) + self.volume_shape[1:], numpy.float32, None),
                    BufferDescription("norm", (self.slab_size,) + self.volume_shape[1:], numpy.int32, None),
                    ]
-        print(buffers)
+#         print(buffers)
         self.allocate_buffers(buffers, use_array=True)
         self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
         self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
                    "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
-        print(self.wg, self.nb_slab)
+#         print(self.wg, self.nb_slab)
         self.send_mask(mask)
 
     def calc_slabs(self):
@@ -400,7 +400,7 @@ class Regrid3D(OpenclProcessing):
         size = self.slab_size * self.volume_shape[1] * self.volume_shape[2]
         wg = self.wg["memset_signal"]
         ts = int(ceil(size / wg)) * wg
-        print(wg, ts, size, self.slab_size, self.volume_shape, self.cl_mem["signal"].shape, self.cl_mem["norm"].shape)
+#         print(wg, ts, size, self.slab_size, self.volume_shape, self.cl_mem["signal"].shape, self.cl_mem["norm"].shape)
         evt = self.program.memset_signal(self.queue, (ts,), (wg,),
                                          self.cl_mem["signal"].data,
                                          self.cl_mem["norm"].data,
@@ -494,7 +494,7 @@ def main():
                                      callback)
         full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
-    save_cxi(data, config)
+    save_cxi(full_volume, config)
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
