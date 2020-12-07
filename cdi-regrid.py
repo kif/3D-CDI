@@ -114,7 +114,7 @@ def parse():
 #                        " option)")
     group.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
                        help="do everything except modifying the file system")
-    group.add_argument("--profile", dest="prefile", action="store_true", default=False,
+    group.add_argument("--profile", action="store_true", default=False,
                        help="Turn on the profiler and print OpenCL profiling at output")
     group = parser.add_argument_group("Experimental setup options")
 #     group.add_argument("-e", "--energy", type=float, default=None,
