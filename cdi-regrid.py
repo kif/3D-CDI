@@ -383,7 +383,7 @@ class Regrid3D(OpenclProcessing):
         for angle, frame in frames.items():
             callback(f"Project angle {angle}")
             self.project_one_frame(frame,
-                                   angle, step,
+                                   numpy.float32(angle), step,
                                    slab_start, slab_end,
                                    oversampling_img, oversampling_rot)
 
