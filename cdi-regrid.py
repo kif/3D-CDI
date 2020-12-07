@@ -114,7 +114,8 @@ def parse():
 #                        " option)")
     group.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
                        help="do everything except modifying the file system")
-
+    group.add_argument("--profile", dest="prefile", action="store_true", default=False,
+                       help="Turn on the profiler and print OpenCL profiling at output")
     group = parser.add_argument_group("Experimental setup options")
 #     group.add_argument("-e", "--energy", type=float, default=None,
 #                        help="Energy of the incident beam in keV")
@@ -410,16 +411,14 @@ class Regrid3D(OpenclProcessing):
         size = self.slab_size * self.volume_shape[1] * self.volume_shape[2]
         wg = self.wg["normalize_signal"]
         ts = int(ceil(size / wg)) * wg
-        signal = self.cl_mem["signal"].data
+        signal_d = self.cl_mem["signal"]
         evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
-                                            signal,
+                                            signal_d.data,
                                             self.cl_mem["norm"].data,
                                             numpy.uint64(size))
         self.profile_add(evt, "Normalization signal/count")
-        result = self.cl_mem["signal"].get()
-        print("get_slab", result.shape, result.dtype, signal.events)
-        if signal.events:
-            self.profile_add(signal.events[-1], "Copy slab D --> H")
+        result = signal_d.get()
+        self.profile_add(signal_d.events[-1], "Copy slab D --> H")
         return result
 
 
@@ -456,7 +455,7 @@ def main():
                       config.beam,
                       config.distance,
                       config.pixelsize,
-                      profile=True,
+                      profile=config.profile,
                       platformid=pid,
                       deviceid=did)
 
@@ -486,7 +485,11 @@ def main():
         print(slab.shape)
     t2 = time.perf_counter()
 
-    print(t1 - t0, t2 - t1, len(frames))
+    if config.profile:
+        print(os.linesep.join(regrid.log_profile()))
+        print("#"*50)
+        print(f"Frame reading: {t1 - t0}s for {len(frames)} frames")
+        print(f"Projection time: {t2 - t1}s using {regrid.nb_slab} slabs")
 
 
 def save_cxi(data, filename):
