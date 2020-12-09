@@ -242,8 +242,11 @@ class Regrid3D(OpenclProcessing):
                                   block_size=block_size, memory=memory, profile=profile)
 
         self.image_shape = tuple(numpy.int32(i) for i in mask.shape)
+        print("image_shape:", self.image_shape)
         self.volume_shape = tuple(numpy.int32(i) for i in volume_shape[:3])
+        print("volume_shape:", self.volume_shape)
         self.center = tuple(numpy.float32(i) for i in center[:2])
+        print("center:", self.center)
         self.pixel_size = numpy.float32(pixel_size)
         self.distance = numpy.float32(distance)
         if slab_size:
