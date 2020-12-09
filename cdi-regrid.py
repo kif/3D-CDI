@@ -188,13 +188,14 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", c
 
                 for instrument in entry.values():
 
-                    if isinstance(instrument, h5py.Group) and instrument.attrs.get("NX_class") == "NXinstrument":
+                    if (isinstance(instrument, h5py.Group) and
+                        as_str(instrument.attrs.get("NX_class")) == "NXinstrument"):
                         break
                 else:
                     continue
                 for detector in instrument.values():
                     if (isinstance(detector, h5py.Group) and
-                        detector.attrs.get("NX_class") == "NXdetector" and
+                        as_str(detector.attrs.get("NX_class", "")) == "NXdetector" and
                         "type" in detector and
                         "data" in detector and
                         (as_str(detector["type"][()])).lower() == "lima"):
@@ -204,7 +205,7 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", c
 
                 for positioners in instrument.values():
                     if (isinstance(positioners, h5py.Group) and
-                        positioners.attrs.get("NX_class") == "NXcollection" and
+                        as_str(positioners.attrs.get("NX_class")) == "NXcollection" and
                         rotation in positioners):
 
                         break
@@ -430,13 +431,6 @@ class Regrid3D(OpenclProcessing):
         return result
 
 
-def process(options, data):
-    """
-    Manage the process
-    """
-    nframes = len(data)
-
-
 def main():
     """Main program
     
@@ -445,6 +439,10 @@ def main():
     config = parse()
     if isinstance(config, int):
         return config
+
+    if len(config.images) == 0:
+        raise RuntimeError("No input file provided !")
+
     frames = {}
     print("Regrid diffraction images in 3D reciprocal space")
 
@@ -469,7 +467,6 @@ def main():
                       platformid=pid,
                       deviceid=did)
 
-#     print("Working on device", regrid.device.name)
     pb = ProgressBar("Reading frames", 100, 30)
 
     def callback(msg, increment=True, cnt={"value": 0}):
@@ -480,6 +477,9 @@ def main():
     t0 = time.perf_counter()
     for fn in config.images:
         frames.update(parse_bliss_file(fn, title=config.scan, rotation=config.rot, scan_len=config.scan_len, callback=callback))
+    if len(frames) == 0:
+        raise RuntimeError("No valid images found in input file ! Check parameters `--rot`, `--scan` and `--scan-len`")
+
     t1 = time.perf_counter()
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
@@ -492,6 +492,7 @@ def main():
                                      config.oversampling_img,
                                      config.oversampling_rot,
                                      callback)
+        print(f"\nvalid voxels: {numpy.sum(numpy.isfinite(slab))}\n")
         full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
     save_cxi(full_volume, config, mask=mask)
@@ -502,6 +503,7 @@ def main():
         print(f"Frame reading: {t1 - t0:6.3f}s for {len(frames)} frames")
         print(f"Projection time: {t2 - t1:6.3f}s using {regrid.nb_slab} slabs")
         print(f"Save time: {t3 - t2:6.3f}s")
+    print("Done -->", config.output)
 
 
 def save_cxi(data, config, mask=None):
