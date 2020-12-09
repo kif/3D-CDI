@@ -248,7 +248,9 @@ class Regrid3D(OpenclProcessing):
         self.center = tuple(numpy.float32(i) for i in center[:2])
         print("center:", self.center)
         self.pixel_size = numpy.float32(pixel_size)
+        print("pixel_size:", self.pixel_size)
         self.distance = numpy.float32(distance)
+        print("distance:", self.distance)
         if slab_size:
             self.slab_size = int(slab_size)
         else:
