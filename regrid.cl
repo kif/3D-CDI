@@ -318,10 +318,10 @@ kernel void regid_CDI_slab(global float* image,
     }
     {//dynamic masking
         value = image[where_in];
-        if (value < -10.0f)
-            return;
-        else if (value <=0.0f)
-            value= 0.0f;
+//        if (value < -10.0f)
+//            return;
+//        else if (value <=0.0f)
+//            value= 0.0f;
         if (! isfinite(value)) 
             return;
     }
