@@ -502,7 +502,8 @@ def main():
         print(f"\nvalid voxels: {numpy.sum(numpy.isfinite(slab))}\n")
         full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
-    save_cxi(full_volume, config, mask=mask)
+    if not config.dry_run:
+        save_cxi(full_volume, config, mask=mask)
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
