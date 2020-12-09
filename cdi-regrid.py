@@ -11,7 +11,7 @@ __author__ = "Jérôme Kieffer"
 __copyright__ = "2020 ESRF"
 __license__ = "MIT"
 __version__ = "0.1"
-__date__ = "07/12/2020"
+__date__ = "09/12/2020"
 
 import os
 import sys
@@ -197,7 +197,7 @@ def parse_bliss_file(filename, title="dscan sz", rotation="ths", scan_len="1", c
                         detector.attrs.get("NX_class") == "NXdetector" and
                         "type" in detector and
                         "data" in detector and
-                        (detector["type"][()]).lower() == "lima"):
+                        (as_str(detector["type"][()])).lower() == "lima"):
                             break
                 else:
                     continue
