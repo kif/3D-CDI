@@ -466,8 +466,8 @@ def main():
     regrid = Regrid3D(mask,
                       shape,
                       config.beam,
-                      config.distance,
                       config.pixelsize,
+                      config.distance,
                       profile=config.profile,
                       platformid=pid,
                       deviceid=did)
