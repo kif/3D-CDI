@@ -36,8 +36,9 @@ float3 inline calc_position_rec(float2 index,
 {
     float2 pos2 = calc_position_real(index, center, pixel_size);
     // float d = sqrt(distance*distance + dot(pos2, pos2));
-    float d = fast_length((float3)(distance, pos2));
-    float3 pos3 = (float3)(pos2.x/d, pos2.y/d, distance/d-1.0f);
+    // float d = fast_length((float3)(distance, pos2));
+    float inv_d = rsqrt(distance*distance + dot(pos2, pos2));
+    float3 pos3 = (float3)(pos2.x*inv_d, pos2.y*inv_d, distance*inv_d-1.0f);
     float scale = distance/pixel_size;
     return scale * (float3)(dot(Rx, pos3), dot(Ry, pos3), dot(Rz, pos3));
 }
