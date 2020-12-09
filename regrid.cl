@@ -350,7 +350,7 @@ kernel void regid_CDI_slab(global float* image,
                 pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
                                 get_global_id(0) + (j + 0.5f)*delta); 
                 recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
-                
+                if (get_local_id(0)==0) printf("x:%f y:%f z:%f", recip.x, recip.y, recip.z);
                 tmp = convert_int_rtn(recip.x) + shape_2;
                 if ((tmp>=0) && (tmp<shape))
                 {
