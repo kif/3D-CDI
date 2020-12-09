@@ -418,9 +418,15 @@ class Regrid3D(OpenclProcessing):
         wg = self.wg["normalize_signal"]
         ts = int(ceil(size / wg)) * wg
         signal_d = self.cl_mem["signal"]
+        norm_d = self.cl_mem["norm"].data
+
+        signal_h = signal_d.get()
+        norm_h = norm_d.get()
+        print(signal_h.sum(), norm_h.sum(), "non empty:", numpy.isfinite(signal_h / norm_h).sum())
+
         evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
                                             signal_d.data,
-                                            self.cl_mem["norm"].data,
+                                            norm_d.data,
                                             numpy.uint64(size))
         self.profile_add(evt, "Normalization signal/count")
         result = signal_d.get()
