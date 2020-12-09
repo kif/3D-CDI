@@ -226,7 +226,7 @@ class Regrid3D(OpenclProcessing):
     "Project a 2D frame to a 3D volume taking into account the curvature of the Ewald's sphere"
     kernel_files = ["regrid.cl"]
 
-    def __init__(self, mask, volume_shape, center, pixel_size, distance, nb_slab=None,
+    def __init__(self, mask, volume_shape, center, pixel_size, distance, slab_size=None,
                  ctx=None, devicetype="all", platformid=None, deviceid=None,
                  block_size=None, memory=None, profile=False):
         """
@@ -235,7 +235,7 @@ class Regrid3D(OpenclProcessing):
         :param center: 2-tuple of float (y,x)
         :param pixel_size: float
         :param distance: float
-        :param nb_slab: split the work into that many slabs. Set to None to guess
+        :param slab_size: Number of slices to be treated at one, the best is to leave the system guess
         
         """
         OpenclProcessing.__init__(self, ctx=None, devicetype=devicetype, platformid=platformid, deviceid=deviceid,
@@ -246,14 +246,13 @@ class Regrid3D(OpenclProcessing):
         self.center = tuple(numpy.float32(i) for i in center[:2])
         self.pixel_size = numpy.float32(pixel_size)
         self.distance = numpy.float32(distance)
-        if nb_slab is None:
-            self.nb_slab = self.calc_slabs()
+        if slab_size:
+            self.slab_size = int(slab_size)
         else:
-            self.nb_slab = int(ceil(nb_slab))
-#         print(self.nb_slab)
-        self.slab_size = int(self.volume_shape[0] / self.nb_slab)
+            self.slab_size = self.calc_slabs()
+        self.nb_slab = int(ceil(self.image_shape[0] / self.slab_size))
         buffers = [BufferDescription("image", self.image_shape, numpy.float32, None),
-                   BufferDescription("mask", self.image_shape, numpy.int8, None),
+                   BufferDescription("mask", self.image_shape, numpy.uint8, None),
                    BufferDescription("signal", (self.slab_size,) + self.volume_shape[1:], numpy.float32, None),
                    BufferDescription("norm", (self.slab_size,) + self.volume_shape[1:], numpy.int32, None),
                    ]
@@ -267,24 +266,18 @@ class Regrid3D(OpenclProcessing):
         self.send_mask(mask)
 
     def calc_slabs(self):
-        "Calculate the number of slabs needed to store data in the device's memory. The fewer, the faster"
+        "Calculate the height of the slab depending on the device's memory. The larger, the better"
 
-        nslab = 1
-        # Limit one slab to 2^32 in size ?
-        # int(ceil((1 << 32) / numpy.prod(self.volume_shape)))
-#         print(nslab)
         device_mem = self.device.memory
         image_nbytes = numpy.prod(self.image_shape) * 4
         mask_nbytes = numpy.prod(self.image_shape) * 1
-        volume_nbytes = numpy.prod(self.volume_shape) * 4 * 2
-        nslab = max(nslab, int(round(volume_nbytes / (0.8 * device_mem - image_nbytes - mask_nbytes))))
-#         print(nslab)
-        # Limit one slab to the maximum allocatable memory
+        volume_nbytes = numpy.prod(self.volume_shape[1:]) * 4 * 2
+        tm_slab = (0.8 * device_mem - image_nbytes - mask_nbytes) / volume_nbytes
+
         device_mem = self.ctx.devices[0].max_mem_alloc_size
-        volume_nbytes = numpy.prod(self.volume_shape) * 4
-        nslab = max(nslab, int(ceil(volume_nbytes / device_mem)))
-#         print(nslab)
-        return nslab
+        am_slab = device_mem / volume_nbytes
+        print("calc_slabs", self.volume_shape[0], tm_slab, am_slab)
+        return  int(min(self.volume_shape[0], tm_slab, am_slab))
 
     def compile_kernels(self, kernel_files=None, compile_options=None):
         """Call the OpenCL compiler
@@ -490,9 +483,8 @@ def main():
     t1 = time.perf_counter()
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
-    slab_heigth = config.shape[0] // regrid.nb_slab
-    for slab_start in numpy.arange(0, config.shape[0], slab_heigth, dtype=numpy.int32):
-        slab_end = min(slab_start + slab_heigth, config.shape[0])
+    for slab_start in numpy.arange(0, config.shape[0], regrid.slab_size, dtype=numpy.int32):
+        slab_end = min(slab_start + regrid.slab_size, config.shape[0])
         pb.title = "Projection onto slab %i-%i" % (slab_start, slab_end)
         slab = regrid.project_frames(frames,
                                      slab_start, slab_end,
