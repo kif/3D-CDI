@@ -418,7 +418,7 @@ class Regrid3D(OpenclProcessing):
         wg = self.wg["normalize_signal"]
         ts = int(ceil(size / wg)) * wg
         signal_d = self.cl_mem["signal"]
-        norm_d = self.cl_mem["norm"].data
+        norm_d = self.cl_mem["norm"]
 
         signal_h = signal_d.get()
         norm_h = norm_d.get()
