@@ -321,8 +321,9 @@ class Regrid3D(OpenclProcessing):
         """
         mask_d = self.cl_mem["mask"]
         assert mask_d.shape == self.image_shape
-        mask_d.set(numpy.ascontiguousarray(mask, dtype=numpy.int8))
+        mask_d.set(numpy.ascontiguousarray(mask, dtype=numpy.uint8))
         self.profile_add(mask_d.events[-1], "Copy mask H --> D")
+        print("Masked pixels", mask.shape, mask_d.get().sum())
 
     def project_one_frame(self, frame,
                           rot, d_rot,
