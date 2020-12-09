@@ -242,15 +242,15 @@ class Regrid3D(OpenclProcessing):
                                   block_size=block_size, memory=memory, profile=profile)
 
         self.image_shape = tuple(numpy.int32(i) for i in mask.shape)
-        print("image_shape:", self.image_shape)
+        logger.debug("image_shape: %s", self.image_shape)
         self.volume_shape = tuple(numpy.int32(i) for i in volume_shape[:3])
-        print("volume_shape:", self.volume_shape)
+        logger.debug("volume_shape: %s", self.volume_shape)
         self.center = tuple(numpy.float32(i) for i in center[:2])
-        print("center:", self.center)
+        logger.debug("center: %s", self.center)
         self.pixel_size = numpy.float32(pixel_size)
-        print("pixel_size:", self.pixel_size)
+        logger.debug("pixel_size: %s", self.pixel_size)
         self.distance = numpy.float32(distance)
-        print("distance:", self.distance)
+        logger.debug("distance: %s", self.distance)
         if slab_size:
             self.slab_size = int(slab_size)
         else:
@@ -261,13 +261,11 @@ class Regrid3D(OpenclProcessing):
                    BufferDescription("signal", (self.slab_size,) + self.volume_shape[1:], numpy.float32, None),
                    BufferDescription("norm", (self.slab_size,) + self.volume_shape[1:], numpy.int32, None),
                    ]
-#         print(buffers)
         self.allocate_buffers(buffers, use_array=True)
         self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
         self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
                    "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
-#         print(self.wg, self.nb_slab)
         self.send_mask(mask)
 
     def calc_slabs(self):
@@ -280,8 +278,9 @@ class Regrid3D(OpenclProcessing):
         tm_slab = (0.8 * device_mem - image_nbytes - mask_nbytes) / volume_nbytes
 
         device_mem = self.ctx.devices[0].max_mem_alloc_size
+        volume_nbytes = numpy.prod(self.volume_shape[1:]) * 4
         am_slab = device_mem / volume_nbytes
-        print("calc_slabs", self.volume_shape[0], tm_slab, am_slab)
+        logger.info("calc_slabs %s %s %s", self.volume_shape[0], tm_slab, am_slab)
         return  int(min(self.volume_shape[0], tm_slab, am_slab))
 
     def compile_kernels(self, kernel_files=None, compile_options=None):
@@ -321,7 +320,6 @@ class Regrid3D(OpenclProcessing):
         assert mask_d.shape == self.image_shape
         mask_d.set(numpy.ascontiguousarray(mask, dtype=numpy.uint8))
         self.profile_add(mask_d.events[-1], "Copy mask H --> D")
-        print("Masked pixels", mask.shape, mask_d.get().sum())
 
     def project_one_frame(self, frame,
                           rot, d_rot,
