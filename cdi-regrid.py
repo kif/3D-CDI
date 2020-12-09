@@ -400,7 +400,6 @@ class Regrid3D(OpenclProcessing):
         size = self.slab_size * self.volume_shape[1] * self.volume_shape[2]
         wg = self.wg["memset_signal"]
         ts = int(ceil(size / wg)) * wg
-#         print(wg, ts, size, self.slab_size, self.volume_shape, self.cl_mem["signal"].shape, self.cl_mem["norm"].shape)
         evt = self.program.memset_signal(self.queue, (ts,), (wg,),
                                          self.cl_mem["signal"].data,
                                          self.cl_mem["norm"].data,
@@ -418,11 +417,6 @@ class Regrid3D(OpenclProcessing):
         ts = int(ceil(size / wg)) * wg
         signal_d = self.cl_mem["signal"]
         norm_d = self.cl_mem["norm"]
-
-        signal_h = signal_d.get()
-        norm_h = norm_d.get()
-        print(signal_h.sum(), norm_h.sum(), "non empty:", numpy.isfinite(signal_h / norm_h).sum())
-
         evt = self.program.normalize_signal(self.queue, (ts,), (wg,),
                                             signal_d.data,
                                             norm_d.data,
@@ -431,8 +425,6 @@ class Regrid3D(OpenclProcessing):
         result = signal_d.get()
         if signal_d.events:
             self.profile_add(signal_d.events[-1], "Copy slab D --> H")
-        else:
-            print("no evt ? ", signal_d.events)
         return result
 
 
@@ -496,7 +488,6 @@ def main():
                                      config.oversampling_img,
                                      config.oversampling_rot,
                                      callback)
-        print(f"\nvalid voxels: {numpy.sum(numpy.isfinite(slab))}\n")
         full_volume[slab_start:slab_end] = slab[:slab_end - slab_start]
     t2 = time.perf_counter()
     if not config.dry_run:
