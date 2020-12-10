@@ -11,7 +11,7 @@ __author__ = "Jérôme Kieffer"
 __copyright__ = "2020 ESRF"
 __license__ = "MIT"
 __version__ = "0.1"
-__date__ = "09/12/2020"
+__date__ = "10/12/2020"
 
 import os
 import sys
@@ -497,7 +497,10 @@ def main():
         print(f"Frame reading: {t1 - t0:6.3f}s for {len(frames)} frames")
         print(f"Projection time: {t2 - t1:6.3f}s using {regrid.nb_slab} slabs")
         print(f"Save time: {t3 - t2:6.3f}s")
-    print("Done -->", config.output)
+    if config.dry_run:
+        print("Done --> None")
+    else:
+        print("Done -->", config.output)
 
 
 def save_cxi(data, config, mask=None):
