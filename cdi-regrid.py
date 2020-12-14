@@ -89,8 +89,8 @@ def parse():
 #                        help="show the list of available formats and exit")
     group.add_argument("-o", "--output", default='reciprocal_volume.cxi', type=str,
                        help="output filename in CXI format")
-    group.add_argument("-s", "--shape", default=None, type=int, nargs=3,
-                       help="Size of the reciprocal volume (3 int), by default 512³")
+    group.add_argument("-s", "--shape", default=512, type=int,
+                       help="Size of the reciprocal volume, by default 512³")
 #     group.add_argument("-D", "--dummy", type=float, default=numpy.nan,
 #                        help="Set masked values to this dummy value")
     group.add_argument("-m", "--mask", dest="mask", type=str, default=None,
@@ -445,6 +445,8 @@ def main():
     shape = config.shape
     if shape is None:
         shape = 512, 512, 512
+    else:
+        shape = (shape, shape, shape)
 
     if config.device is None:
         pid, did = None, None
