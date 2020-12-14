@@ -480,8 +480,8 @@ def main():
     t1 = time.perf_counter()
 
     pb.max_value = (len(frames) + 2) * regrid.nb_slab
-    for slab_start in numpy.arange(0, config.shape[0], regrid.slab_size, dtype=numpy.int32):
-        slab_end = min(slab_start + regrid.slab_size, config.shape[0])
+    for slab_start in numpy.arange(0, shape[0], regrid.slab_size, dtype=numpy.int32):
+        slab_end = min(slab_start + regrid.slab_size, shape[0])
         pb.title = "Projection onto slab %i-%i" % (slab_start, slab_end)
         slab = regrid.project_frames(frames,
                                      slab_start, slab_end,
