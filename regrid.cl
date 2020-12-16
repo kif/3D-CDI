@@ -408,12 +408,45 @@ kernel void regid_CDI_slab(global float* image,
  * Regrid an image (height x width) to a 3D volume (shape³)
  * 
  * In this kernel populates a slab along y (x and z have the full size) 
- * with a subset of the image, one horizontal band from   
+ * with a subset of the image, one horizontal band from y_start to y_end 
  * 
  * Slabed, store only data starting at slab_start <= y < slab_end
  * 
  * Nota, some pixels will overlap at the slab boundary, it is advised to send a 
  * couple of extra lines of the image rather than missing part of the image. 
+ * 
+ * param image: 2D image. Only a limited number of lines by be given by y_start, y_end 
+ * param mask: 2D mask, non zero values are ignored. The full mask is always used
+ * param height: the height of the full image and of the mask 
+ * param width: the width of the image
+ * param y_start: the starting line number of the image 0<=y_start<height
+ * param y_end: the last line number of the image 0<=y_start<y_end<=height
+ * param pixel size: the size of one pixel in the image, assumed square, in meter
+ * param distance: the sample to detector distance in meter
+ * param phi: the rotation angle of the sample along the y-axis of the image
+ * param dphi: the step size of the rotation (in case of continuous rotation)
+ * param center_y: the coordinate of the beam center on the image along y
+ * param center_x: the coordinate of the beam center on the image along x
+ * param scale: Zooming out factor, a scale of one matches one pixel to one voxel, for 2, 2x2  pixels match to 1 voxel  
+ * param signal: the output slab used for accumulating all signal, which size is: (shape, slaby_end-slaby_start, shape)
+ * param norm: the normalization array for the slab, same shape. 
+ * param shape: size of the final volume (in each direction)
+ * param slaby_start: the index of begining of slab 0<= slaby_start<slaby_end <=shape
+ * param slaby_end: the index of end of slab: slab 0<= slaby_start<slaby_end <=shape
+ * param oversampling_pixel: split each pixel into a t*t sub pixel and project the according number of times. Smoother results
+ * param oversampling_phi: project each frame that many times beteween phi and phi+dphi. Exact only in continuous/oscilation mode !
+ * 
+ * Workgroup size policy: 
+ * 1 work-item per pixel
+ * Dimention 0 is x
+ * Dimention 1 is y (as in cuda !)
+ * 
+ * The workgroup should be small (due to large register usage)
+ * and aligned along x which gives: 
+ * 
+ * global size: (width, heigth)
+ * workgroup size:(32, 1)
+ * assuming cuda device.    
  * 
  */
 
@@ -427,15 +460,16 @@ kernel void regid_CDI_slaby(global float* image,
                            const  float  distance,
                            const  float  phi,
                                   float  dphi,
-                           const  float  center_x,
                            const  float  center_y,
-                           global float* signal,
+                           const  float  center_x,
+						   const  float  scale,
+						   global float* signal,
                            global int*   norm,
                            const  int    shape,
                            const  int    slaby_start,
                            const  int    slaby_end,
-                                  int    oversampling_pixel,
-                                  int    oversampling_phi)
+						   const  int    oversampling_pixel,
+						   const  int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k, x, y_local, y_global;
     ulong where_in, where_out;
@@ -445,8 +479,9 @@ kernel void regid_CDI_slaby(global float* image,
     
     //This is local storage of voxels to be written
     int last=0;
-    ulong index[STORAGE_SIZE];
-    float2 store[STORAGE_SIZE];
+    ulong index[STORAGE_SIZE];   // store the position in the slab/volume
+    float store_s[STORAGE_SIZE]; // store the signal
+    uint  store_n[STORAGE_SIZE];  // store the normalization
 
     //This is a convention, be aware when launching the kernel !
     x = get_global_id(0);
@@ -456,8 +491,9 @@ kernel void regid_CDI_slaby(global float* image,
     
     where_in = width*y_local + x;
     shape_2 = shape/2;
-    oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
-    oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
+    // Don't be stupid !
+    //oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
+    //oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
     delta = 1.0f / oversampling_pixel;
     dphi /= oversampling_phi;
     
@@ -501,7 +537,7 @@ kernel void regid_CDI_slaby(global float* image,
             {
                 pos2 = (float2)(x + (i + 0.5f)*delta, 
                                 y_global + (j + 0.5f)*delta); 
-                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
+                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz)/scale;
                 //if (get_local_id(0)==0) printf("x:%f y:%f z:%f", recip.x, recip.y, recip.z);
                 tmp = convert_int_rtn(recip.x) + shape_2;
                 if ((tmp>=0) && (tmp<shape))
@@ -522,7 +558,8 @@ kernel void regid_CDI_slaby(global float* image,
                             {
                                 if (where_out == index[k])
                                 {
-                                        store[k] += (float2)(value, 1.0f);
+                                        store_s[k] += value;
+                                        store_n[k] += 1;
                                         found = 1;
                                         k = last;
                                 }
@@ -534,7 +571,8 @@ kernel void regid_CDI_slaby(global float* image,
                                 else
                                 {
                                     index[last] = where_out;
-                                    store[last] = (float2)(value, 1.0f);
+                                    store_s[last] = value;
+                                    store_n[last] = 1;
                                     last++;
                                 }
                             }  
@@ -547,10 +585,8 @@ kernel void regid_CDI_slaby(global float* image,
     // Finally we update the global memory with atomic writes
     for (k=0; k<last; k++)
     {
-        atomic_add_global_float(&signal[index[k]], store[k].s0);
-        atomic_add(&norm[index[k]], (int)store[k].s1);
-        //signal[index[k]] += store[k].s0;
-        //norm[index[k]] += (int)store[k].s1;
+        atomic_add_global_float(&signal[index[k]], store_s[k]);
+        atomic_add(&norm[index[k]], store_n[k]);
     }
 }
 
