@@ -11,7 +11,7 @@ __author__ = "Jérôme Kieffer"
 __copyright__ = "2020 ESRF"
 __license__ = "MIT"
 __version__ = "0.9"
-__date__ = "16/12/2020"
+__date__ = "17/12/2020"
 
 import os
 import sys
@@ -514,7 +514,7 @@ class Regrid3D(OpenclProcessing):
         self.send_image(frame, img_slice)
         wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
-        evt = self.program.regid_CDI_slaby(self.queue, (ts, self.image_shape[0]) , (wg, 1),
+        evt = self.program.regid_CDI_slaby(self.queue, (ts, img_slice.stop-img_slice.start) , (wg, 1),
                                            self.cl_mem["image"].data,
                                            self.cl_mem["mask"].data,
                                            *self.image_shape,
