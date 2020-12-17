@@ -392,11 +392,10 @@ class Regrid3D(OpenclProcessing):
 
         self.nb_slab = int(ceil(self.volume_shape[1] / self.slab_size))
         # Homogenize the slab size ... no need to stress the GPU memory
-        self.slab_size = int(ceil(self.volume_shape[1] / self.nb_slab))
+        self.slab_size = numpy.int32(ceil(self.volume_shape[1] / self.nb_slab))
 
         self.slicing = self.calc_slicing()
-        for k, v in self.slicing.items():
-            print(f"slab {k}: image {v}")
+        logger.info(os.linesep.join(["Slicing pattern:"] + [f"slab Y [{k[0]:4d}:{k[1]:4d}] <=> image lines [{v[0]:4d}:{v[1]:4d}]" for k,v in self.slicing.items()]))
 
         buffers = [BufferDescription("image", self.image_shape, numpy.float32, None),
                    BufferDescription("mask", self.image_shape, numpy.uint8, None),
@@ -424,7 +423,7 @@ class Regrid3D(OpenclProcessing):
         device_mem = self.ctx.devices[0].max_mem_alloc_size
         volume_nbytes = self.volume_shape[0] * self.volume_shape[2] * float_size
         am_slab = device_mem / volume_nbytes
-        logger.info("calc_slabs %s total mem says: %s allocatable mem says: %s", self.volume_shape[1], tm_slab, am_slab)
+        logger.info("calc_slabs: Volume size in y: %d. Limits from total memory: %.1f lines and max allocatable mem limits to %.1f lines", self.volume_shape[1], tm_slab, am_slab)
         return  int(min(self.volume_shape[0], tm_slab, am_slab))
 
     def calc_slicing(self):
@@ -479,7 +478,7 @@ class Regrid3D(OpenclProcessing):
         image_d = self.cl_mem["image"]
         if slice_ is not None:
              slice_ = slice(max(0, slice_.start), min(self.image_shape[0], slice_.stop))
-             img = numpy.ascontiguousarray(image, dtype=numpy.float32)
+             img = numpy.ascontiguousarray(image[slice_], dtype=numpy.float32)
              evt = pyopencl.enqueue_copy(self.queue, image_d.data, img)
              self.profile_add(evt, "Copy image H --> D")
         else:
@@ -512,6 +511,8 @@ class Regrid3D(OpenclProcessing):
         """
 
         self.send_image(frame, img_slice)
+        if img_slice is None:
+            img_slice = slice(0,  self.image_shape[0])
         wg = self.wg["regid_CDI_slab"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
         evt = self.program.regid_CDI_slaby(self.queue, (ts, img_slice.stop-img_slice.start) , (wg, 1),
@@ -527,6 +528,7 @@ class Regrid3D(OpenclProcessing):
                                            self.cl_mem["signal"].data,
                                            self.cl_mem["norm"].data,
                                            self.volume_shape[-1],
+                                           self.slab_size,
                                            vol_slice.start,
                                            vol_slice.stop,
                                            oversampling_img,
@@ -666,6 +668,7 @@ def main():
                       config.beam[-1::-1],
                       config.pixelsize,
                       config.distance,
+                      scale=config.scale,
                       profile=config.profile,
                       platformid=pid,
                       deviceid=did)
@@ -699,10 +702,10 @@ def main():
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
-        print("#"*50)
-        print(f"Frame reading: {t1 - t0:6.3f}s for {len(frames)} frames")
-        print(f"Projection time: {t2 - t1:6.3f}s using {regrid.nb_slab} slabs")
-        print(f"Save time: {t3 - t2:6.3f}s")
+    print("#"*50)
+    print(f"Frame reading: {t1 - t0:6.3f}s for {len(frames)} frames")
+    print(f"Projection time: {t2 - t1:6.3f}s using {regrid.nb_slab} slabs")
+    print(f"Save time: {t3 - t2:6.3f}s")
     if config.dry_run:
         print("Done --> None")
     else:

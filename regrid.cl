@@ -466,6 +466,7 @@ kernel void regid_CDI_slaby(global float* image,
 						   global float* signal,
                            global int*   norm,
                            const  int    shape,
+                           const  int    slaby_size,
                            const  int    slaby_start,
                            const  int    slaby_end,
 						   const  int    oversampling_pixel,
@@ -550,7 +551,7 @@ kernel void regid_CDI_slaby(global float* image,
                         tmp = convert_int_rtn(recip.z) + shape_2;
                         if ((tmp>=0) && (tmp<shape))
                         {
-                            where_out += ((long)tmp) * shape * (slaby_end-slaby_start);                          
+                            where_out += (ulong) tmp * shape * slaby_size;                          
                             
                             //storage locally
                             int found = 0;
