@@ -689,9 +689,13 @@ def main():
                                      oversampling_rot=config.oversampling_rot)
     t2 = time.perf_counter()
     if not config.dry_run:
-        pb.title = "Save volume"
-        pb.update(message=config.output)
-        save_cxi(full_volume, config, mask=mask)
+        pb.title = "Save data" 
+        pb.update(pb.max_value, config.output)
+        if config.output.endswith(".npy"):
+            numpy.save(config.output, full_volume)
+        else:
+            save_cxi(full_volume, config, mask=mask)
+
     t3 = time.perf_counter()
     if config.profile:
         print(os.linesep.join(regrid.log_profile()))
