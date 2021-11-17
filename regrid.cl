@@ -47,7 +47,7 @@ float3 inline calc_position_rec(float2 index,
  *
  * 2D kernel, one thread per input pixel. Scatter-like kernel with atomics.
  * 
- * pixel start at 0 and finish at 1, the center is at 0.5
+ * pixel start at -0.5 and finish at 0.5, the center is at 0.0
  * thread ids follow the memory location convention (zyx) not the math x,y,z convention 
  *   
  * Basic oversampling implemented but slows down the processing, mainly for calculating 
@@ -66,11 +66,11 @@ kernel void regid_CDI_simple(global float* image,
                              global float* signal,
                              global float* norm,
                              const  int    shape,
-                                    int    oversampling)
+                             const  int    oversampling)
 {
-    int tmp, shape_2, i, j, k;
+    int tmp, i, j, k;
     ulong where_in, where_out;
-    float value, cos_phi, sin_phi, delta, start;
+    float value, cos_phi, sin_phi;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
         
@@ -78,20 +78,19 @@ kernel void regid_CDI_simple(global float* image,
         return;
     
     where_in = width*get_global_id(0)+get_global_id(1);
-    shape_2 = shape/2;
-    oversampling = (oversampling<1?1:oversampling);
-    start = 0.5f / oversampling;
-    delta = 2 * start;
-    
-    cos_phi = cos(phi*M_PI_F/180.0f);
-    sin_phi = sin(phi*M_PI_F/180.0f);
+    const int shape_2 = shape/2;
+    const float start = -0.5f * (oversampling - 1);
+    const float  delta = 1.0f / oversampling;
+    const float phi_rad= phi * M_PI_F / 180.0f;
+    cos_phi = cos(phi_rad);
+    sin_phi = sin(phi_rad);
     Rx = (float3)(cos_phi, 0.0f, sin_phi);
     Ry = (float3)(0.0f, 1.0f, 0.0f);
     Rz = (float3)(-sin_phi, 0.0f, cos_phi);
     
     // No oversampling for now
     //this is the center of the pixel
-    //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
+    //pos2 = (float2)(get_global_id(1)+start, get_global_id(0) + start); 
     
     //Basic oversampling    
 
@@ -99,8 +98,8 @@ kernel void regid_CDI_simple(global float* image,
     {
         for (j=0; j<oversampling; j++)
         {
-            pos2 = (float2)(get_global_id(1) + start + i*delta, 
-                            get_global_id(0) + start + j*delta); 
+            pos2 = (float2)(get_global_id(1) + (start + i)*delta, 
+                            get_global_id(0) + (start + j)*delta); 
             recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
             value = image[where_in];
     
@@ -153,6 +152,7 @@ kernel void regid_CDI(global float* image,
     float value, delta;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
+    const float D2R = M_PI_F/180.0f;
     
     //This is local storage of voxels to be written
     int last=0;
@@ -165,6 +165,8 @@ kernel void regid_CDI(global float* image,
     oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
     delta = 1.0f / oversampling_pixel;
     dphi /= oversampling_phi;
+    const float start_pix = -0.5f * (oversampling_pixel - 1);
+    const float start_phi = -0.5f * (oversampling_phi-1);
     
     { //Manual mask definition
         int y = get_global_id(0),
@@ -198,7 +200,7 @@ kernel void regid_CDI(global float* image,
     for (int dr=0; dr<oversampling_phi; dr++)
     {
         float cos_phi, sin_phi, rphi;
-        rphi = (phi + (0.0f + dr)*dphi) * M_PI_F/180.0f; 
+        rphi = (phi + (start_phi + dr)*dphi) * D2R; 
         cos_phi = cos(rphi);
         sin_phi = sin(rphi);
         Rx = (float3)(cos_phi, 0.0f, sin_phi);
@@ -208,8 +210,8 @@ kernel void regid_CDI(global float* image,
         {
             for (j=0; j<oversampling_pixel; j++)
             {
-                pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
-                                get_global_id(0) + (j + 0.5f)*delta); 
+                pos2 = (float2)(get_global_id(1) + (i + start_pix)*delta, 
+                                get_global_id(0) + (j + start_pix)*delta); 
                 recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
                 
                 tmp = convert_int_rtn(recip.x) + shape_2;
@@ -285,14 +287,15 @@ kernel void regid_CDI_slab(global float* image,
                            const  int    shape,
                            const  int    slab_start,
                            const  int    slab_end,
-                                  int    oversampling_pixel,
-                                  int    oversampling_phi)
+                           const  int    oversampling_pixel,
+                           const  int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k;
     ulong where_in, where_out;
-    float value, delta;
+    float value;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
+    const float D2R = M_PI_F/180.0f;
     
     //This is local storage of voxels to be written
     int last=0;
@@ -301,10 +304,14 @@ kernel void regid_CDI_slab(global float* image,
     
     where_in = width*get_global_id(0)+get_global_id(1);
     shape_2 = shape/2;
-    oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
-    oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
-    delta = 1.0f / oversampling_pixel;
-    dphi /= oversampling_phi;
+
+    // dont' be stupid!
+    // oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
+    //oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
+    const float delta_pix = 1.0f / oversampling_pixel;
+    const float delta_phi = dphi / oversampling_phi;
+    const float start_pix = -0.5f * (oversampling_pixel - 1);
+    const float start_phi = -0.5f * (oversampling_phi - 1);
     
     { //Manual mask definition
         int y = get_global_id(0),
@@ -327,18 +334,12 @@ kernel void regid_CDI_slab(global float* image,
             return;
     }
     
-
-    
-    // No oversampling for now
-    //this is the center of the pixel
-    //pos2 = (float2)(get_global_id(1)+0.5f, get_global_id(0) + 0.5f); 
-
     
     //Basic oversampling
     for (int dr=0; dr<oversampling_phi; dr++)
     {
         float cos_phi, sin_phi, rphi;
-        rphi = (phi + (0.0f + dr)*dphi) * M_PI_F/180.0f; 
+        rphi = (phi + (start_phi + dr)*delta_phi) * D2R; 
         cos_phi = cos(rphi);
         sin_phi = sin(rphi);
         Rx = (float3)(cos_phi, 0.0f, sin_phi);
@@ -348,8 +349,8 @@ kernel void regid_CDI_slab(global float* image,
         {
             for (j=0; j<oversampling_pixel; j++)
             {
-                pos2 = (float2)(get_global_id(1) + (i + 0.5f)*delta, 
-                                get_global_id(0) + (j + 0.5f)*delta); 
+                pos2 = (float2)(get_global_id(1) + (i + start_pix)*delta_pix, 
+                                get_global_id(0) + (j + start_pix)*delta_pix); 
                 recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz);
                 //if (get_local_id(0)==0) printf("x:%f y:%f z:%f", recip.x, recip.y, recip.z);
                 tmp = convert_int_rtn(recip.x) + shape_2;
@@ -454,29 +455,31 @@ kernel void regid_CDI_slaby(global float* image,
                            global uchar* mask,
                            const  int    height,
                            const  int    width,
-						   const  int    y_start,
-						   const  int    y_end,
+                           const  int    y_start,
+                           const  int    y_end,
                            const  float  pixel_size,
                            const  float  distance,
                            const  float  phi,
                                   float  dphi,
                            const  float  center_y,
                            const  float  center_x,
-						   const  float  scale,
-						   global float* signal,
+                           const  float  scale,
+                           global float* signal,
                            global int*   norm,
                            const  int    shape,
                            const  int    slaby_size,
                            const  int    slaby_start,
                            const  int    slaby_end,
-						   const  int    oversampling_pixel,
-						   const  int    oversampling_phi)
+                           const  int    oversampling_pixel,
+                           const  int    oversampling_phi)
 {
     int tmp, shape_2, i, j, k, x, y_local, y_global;
     ulong where_in, where_out;
-    float value, delta;
+    float value;
     float2 pos2, center = (float2)(center_x, center_y);
     float3 Rx, Ry, Rz, recip;
+    const float D2R = M_PI_F/180.0f;
+    const float iscale = 1.0f/scale;
     
     //This is local storage of voxels to be written
     int last=0;
@@ -492,16 +495,18 @@ kernel void regid_CDI_slaby(global float* image,
     
     where_in = width*y_local + x;
     shape_2 = shape/2;
-    // Don't be stupid !
-    //oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
-    //oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
-    delta = 1.0f / oversampling_pixel;
-    dphi /= oversampling_phi;
+    // Don't be stupid! 
+    // oversampling_pixel = (oversampling_pixel<1?1:oversampling_pixel);
+    // oversampling_phi = (oversampling_phi<1?1:oversampling_phi);
+    const float delta_pix = 1.0f / oversampling_pixel;
+    const float delta_phi = dphi / oversampling_phi;
+    const float start_pix = -0.5f * (oversampling_pixel-1);
+    const float start_phi = -0.5f * (oversampling_phi-1);
     
     { //Manual mask definition
         if ((x >= width) ||
             (y_global >= height) ||
-			(y_global >= y_end))
+            (y_global >= y_end))
             return;
     }
     { // static mask
@@ -526,7 +531,7 @@ kernel void regid_CDI_slaby(global float* image,
     for (int dr=0; dr<oversampling_phi; dr++)
     {
         float cos_phi, sin_phi, rphi;
-        rphi = (phi + (0.0f + dr)*dphi) * M_PI_F/180.0f; 
+        rphi = (phi + (start_phi + dr)*delta_phi) * D2R; 
         cos_phi = cos(rphi);
         sin_phi = sin(rphi);
         Rx = (float3)(cos_phi, 0.0f, sin_phi);
@@ -536,9 +541,9 @@ kernel void regid_CDI_slaby(global float* image,
         {
             for (j=0; j<oversampling_pixel; j++)
             {
-                pos2 = (float2)(x + (i + 0.5f)*delta, 
-                                y_global + (j + 0.5f)*delta); 
-                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz)/scale;
+                pos2 = (float2)(x + (i + start_pix)*delta_pix, 
+                                y_global + (j + start_pix)*delta_pix); 
+                recip = calc_position_rec(pos2, center, pixel_size, distance, Rx, Ry, Rz)*iscale;
                 //if (get_local_id(0)==0) printf("x:%f y:%f z:%f", recip.x, recip.y, recip.z);
                 tmp = convert_int_rtn(recip.x) + shape_2;
                 if ((tmp>=0) && (tmp<shape))
