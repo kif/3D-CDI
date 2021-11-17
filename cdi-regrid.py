@@ -255,9 +255,9 @@ def parse():
     group.add_argument("--scan-len", type=str, dest="scan_len", default="1",
                        help="Pick scan which match that length (unless take all scans")
     group = parser.add_argument_group("Oversampling options to reduces the moiré pattern")
-    group.add_argument("--oversampling-img", type=int, dest="oversampling_img", default=8,
+    group.add_argument("--oversampling-img", type=int, dest="oversampling_img", default=7,
                        help="How many sub-pixel there are in one pixel (squared)")
-    group.add_argument("--oversampling-rot", type=int, dest="oversampling_rot", default=8,
+    group.add_argument("--oversampling-rot", type=int, dest="oversampling_rot", default=7,
                        help="How many times a frame is projected")
     group = parser.add_argument_group("OpenCL options")
     group.add_argument("--device", type=int, default=None, nargs=2,
@@ -406,7 +406,7 @@ class Regrid3D(OpenclProcessing):
         self.compile_kernels([os.path.join(os.path.dirname(os.path.abspath(__file__)), "regrid.cl")])
         self.wg = {"normalize_signal": self.kernels.max_workgroup_size("normalize_signal"),  # largest possible WG
                    "memset_signal": self.kernels.max_workgroup_size("memset_signal"),  # largest possible WG
-                   "regid_CDI_slab": self.kernels.min_workgroup_size("regid_CDI_slab")}
+                   "regid_CDI_slaby": self.kernels.min_workgroup_size("regid_CDI_slaby")}
         self.send_mask(mask)
         self.progress_bar = None
 
@@ -513,7 +513,7 @@ class Regrid3D(OpenclProcessing):
         self.send_image(frame, img_slice)
         if img_slice is None:
             img_slice = slice(0,  self.image_shape[0])
-        wg = self.wg["regid_CDI_slab"]
+        wg = self.wg["regid_CDI_slaby"]
         ts = int(ceil(self.image_shape[1] / wg)) * wg
         evt = self.program.regid_CDI_slaby(self.queue, (ts, img_slice.stop-img_slice.start) , (wg, 1),
                                            self.cl_mem["image"].data,
